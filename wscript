@@ -9,7 +9,7 @@ def options(opt):
 
     opt.load(['compiler_c', 'compiler_cxx', 'gnu_dirs'])
 
-    opt.load(['default-compiler-flags', 'boost',
+    opt.load(['default-compiler-flags', 'coverage', 'boost',
               'doxygen', 'sphinx_build'],
               tooldir=['.waf-tools'])
 
@@ -41,6 +41,9 @@ def configure(conf):
         Logs.error("Please upgrade your distribution or install custom boost libraries" +
                    " (http://redmine.named-data.net/projects/nfd/wiki/Boost_FAQ)")
         return
+
+    # Loading "late" to prevent tests to be compiled with profiling flags
+    conf.load('coverage')
 
     conf.write_config_header('src/config.h')
 
