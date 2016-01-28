@@ -21,7 +21,10 @@
 
 #include "boost-test.hpp"
 
-namespace nTorrent {
+namespace ndn {
+
+namespace ntorrent {
+
 namespace tests {
 
 BOOST_AUTO_TEST_SUITE(DummyTest)
@@ -34,4 +37,7 @@ BOOST_AUTO_TEST_CASE(Dummy)
 BOOST_AUTO_TEST_SUITE_END()
 
 } // namespace tests
-} // namespace nTorrent
+
+} // namespace ntorrent
+
+} // namespace ndn
