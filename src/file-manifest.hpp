@@ -22,9 +22,9 @@
 #define INCLUDED_FILE_MANIFEST_HPP
 
 #include <cstring>
-#include <list>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include <ndn-cxx/data.hpp>
@@ -53,6 +53,39 @@ class FileManifest : public Data {
   };
 
  public:
+  // CLASS METHODS
+  static std::vector<FileManifest>
+  generate(const std::string& filePath,
+           const ndn::Name&   manifestPrefix,
+           size_t             subManifestSize,
+           size_t             dataPacketSize);
+
+
+  static std::pair<std::vector<FileManifest>, std::vector<Data>>
+  generate(const std::string& filePath,
+           const ndn::Name&   manifestPrefix,
+           size_t             subManifestSize,
+           size_t             dataPacketSize,
+           bool               returnData);
+  /**
+   * \brief Generates the FileManifest(s) and Data packets for the file at the specified 'filePath'
+   *
+   * @param filePath The path to the file for which we are to create a manifest
+   * @param manifestPrefix The prefix to be used for the name of this manifest
+   * @param subManifestSize The maximum number of data packets to be included in a sub-manifest
+   * @param dataPacketSize The maximum number of bytes per Data packet packets for the file
+   * @param returnData If true also return the Data
+   *
+   * @throws Error if there is any I/O issue when trying to read the filePath.
+   *
+   * Generates the FileManfiest(s) for the file at the specified 'filePath', splitting the manifest
+   * into sub-manifests of size at most the specified 'subManifestSize'. Each sub-manifest is
+   * composed of a  catalog of Data packets of at most the specified 'dataPacketSize'. Returns all
+   * of the manifests that were created in order. The behavior is undefined unless the
+   * trailing component of of the manifestPrefix is a subComponent filePath and
+   '* O < subManifestSize' and '0 < dataPacketSize'.
+   */
+
   // CREATORS
   FileManifest() = delete;
 
@@ -129,8 +162,16 @@ class FileManifest : public Data {
   /// Assigns the value of the specific 'rhs' object to this object.
 
   void
+  set_submanifest_ptr(std::shared_ptr<Name> subManifestPtr);
+  /// Sets the sub-manifest pointer of manifest to the specified 'subManifestPtr'
+
+  void
   push_back(const Name& name);
   /// Appends a Name to the catalog
+
+  void
+  reserve(size_t capacity);
+  /// Reserve memory in the catalog adequate to hold at least 'capacity' Names.
 
   bool
   remove(const Name& name);
@@ -179,6 +220,16 @@ bool operator!=(const FileManifest& lhs, const FileManifest& rhs);
 /// Returns 'true' if 'lhs' and 'rhs' have different values, and 'false' otherwise.
 
 inline
+std::vector<FileManifest>
+FileManifest::generate(const std::string& filePath,
+                       const ndn::Name&   manifestPrefix,
+                       size_t             subManifestSize,
+                       size_t             dataPacketSize)
+{
+  return generate(filePath, manifestPrefix, subManifestSize, dataPacketSize, false).first;
+}
+
+inline
 FileManifest::FileManifest(
                const Name&              name,
                size_t                   dataPacketSize,
@@ -192,6 +243,7 @@ FileManifest::FileManifest(
 , m_submanifestPtr(subManifestPtr)
 {
 }
+
 
 inline
 FileManifest::FileManifest(
@@ -247,6 +299,18 @@ inline std::shared_ptr<Name>
 FileManifest::submanifest_ptr() const
 {
   return m_submanifestPtr;
+}
+
+inline void
+FileManifest::set_submanifest_ptr(std::shared_ptr<Name> subManifestPtr)
+{
+  m_submanifestPtr = subManifestPtr;
+}
+
+inline void
+FileManifest::reserve(size_t capacity)
+{
+  m_catalog.reserve(capacity);
 }
 
 }  // end ntorrent
