@@ -21,9 +21,16 @@
 
 #include "torrent-file.hpp"
 
+#include <ndn-cxx/security/key-chain.hpp>
+#include <ndn-cxx/security/signing-helpers.hpp>
+
 #include <algorithm>
 
 #include <boost/range/adaptors.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+
+namespace fs = boost::filesystem;
 
 namespace ndn {
 
@@ -57,18 +64,6 @@ TorrentFile::TorrentFile(const Name& torrentFileName,
 TorrentFile::TorrentFile(const Block& block)
 {
   this->wireDecode(block);
-}
-
-const Name&
-TorrentFile::getName() const
-{
-  return Data::getName();
-}
-
-const Name&
-TorrentFile::getCommonPrefix() const
-{
-  return m_commonPrefix;
 }
 
 void
@@ -186,14 +181,14 @@ TorrentFile::decodeContent()
   // Check whether there is a TorrentFilePtr
   auto element = content.elements_begin();
   if (content.elements_end() == element) {
-    BOOST_THROW_EXCEPTION(Error(".Torrent-file with empty content"));
+    BOOST_THROW_EXCEPTION(Error("Torrent-file with empty content"));
   }
   element->parse();
   Name name(*element);
   if (name.empty())
-    BOOST_THROW_EXCEPTION(Error("Empty name included in the .torrent-file"));
+    BOOST_THROW_EXCEPTION(Error("Empty name included in the torrent-file"));
 
-  if (name.get(name.size() - 3) == name::Component(".torrent-file")) {
+  if (name.get(name.size() - 3) == name::Component("torrent-file")) {
     m_torrentFilePtr = name;
     ++element;
     m_commonPrefix = Name(*element);
@@ -209,11 +204,11 @@ TorrentFile::decodeContent()
     element->parse();
     Name fileManifestSuffix(*element);
     if (fileManifestSuffix.empty())
-      BOOST_THROW_EXCEPTION(Error("Empty manifest file name included in the .torrent-file"));
+      BOOST_THROW_EXCEPTION(Error("Empty manifest file name included in the torrent-file"));
     this->insertToSuffixCatalog(fileManifestSuffix);
   }
   if (m_suffixCatalog.size() == 0) {
-    BOOST_THROW_EXCEPTION(Error(".Torrent-file with empty catalog of file manifest names"));
+    BOOST_THROW_EXCEPTION(Error("Torrent-file with empty catalog of file manifest names"));
   }
 }
 
@@ -233,6 +228,74 @@ TorrentFile::finalize()
   this->createSuffixCatalog();
   this->encodeContent();
   m_suffixCatalog.clear();
+}
+
+std::pair<std::vector<TorrentFile>,
+          std::vector<std::pair<std::vector<FileManifest>,
+                                std::vector<Data>>>>
+TorrentFile::generate(const std::string& directoryPath,
+                      size_t namesPerSegment,
+                      size_t subManifestSize,
+                      size_t dataPacketSize,
+                      bool returnData)
+{
+  BOOST_ASSERT(0 < namesPerSegment);
+
+  std::vector<TorrentFile> torrentSegments;
+
+  fs::path path(directoryPath);
+  if (!fs::exists(path)) {
+    BOOST_THROW_EXCEPTION(Error(directoryPath + ": no such directory."));
+  }
+
+  Name directoryPathName(directoryPath);
+  fs::recursive_directory_iterator directoryPtr(fs::system_complete(directoryPath).string());
+
+  Name commonPrefix("/NTORRENT" +
+                    directoryPathName.getSubName(directoryPathName.size() - 1).toUri());
+
+  Name torrentName(commonPrefix.toUri() + "/torrent-file");
+  TorrentFile currentTorrentFile(torrentName, commonPrefix, {});
+  std::vector<std::pair<std::vector<FileManifest>, std::vector<Data>>> manifestPairs;
+
+  size_t manifestFileCounter = 0u;
+  for (fs::recursive_directory_iterator i = directoryPtr;
+       i != fs::recursive_directory_iterator();
+       ++i) {
+    Name manifestPrefix("/NTORRENT" +
+                        directoryPathName.getSubName(directoryPathName.size() - 1).toUri());
+    std::pair<std::vector<FileManifest>, std::vector<Data>> currentManifestPair =
+                                                    FileManifest::generate((*i).path().string(),
+                                                    manifestPrefix, subManifestSize,
+                                                    dataPacketSize, returnData);
+
+    if (manifestFileCounter != 0 && 0 == manifestFileCounter % namesPerSegment) {
+      torrentSegments.push_back(currentTorrentFile);
+      Name currentTorrentName = torrentName;
+      currentTorrentName.appendSequenceNumber(static_cast<int>(manifestFileCounter));
+      currentTorrentFile = TorrentFile(currentTorrentName, commonPrefix, {});
+    }
+    currentTorrentFile.insert(currentManifestPair.first[0].getName());
+    currentManifestPair.first.shrink_to_fit();
+    currentManifestPair.second.shrink_to_fit();
+    manifestPairs.push_back(currentManifestPair);
+    ++manifestFileCounter;
+  }
+
+  // Sign and append the last torrent-file
+  security::KeyChain keyChain;
+  keyChain.sign(currentTorrentFile, signingWithSha256());
+  torrentSegments.push_back(currentTorrentFile);
+
+  for (auto it = torrentSegments.rbegin() + 1; it != torrentSegments.rend(); ++it) {
+    auto next = it - 1;
+    it->setTorrentFilePtr(next->getFullName());
+    keyChain.sign(*it, signingWithSha256());
+  }
+
+  torrentSegments.shrink_to_fit();
+  manifestPairs.shrink_to_fit();
+  return std::make_pair(torrentSegments, manifestPairs);
 }
 
 } // namespace ntorrent

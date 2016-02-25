@@ -22,6 +22,8 @@
 #ifndef TORRENT_FILE_HPP
 #define TORRENT_FILE_HPP
 
+#include "file-manifest.hpp"
+
 #include <ndn-cxx/name.hpp>
 #include <ndn-cxx/encoding/block.hpp>
 #include <ndn-cxx/data.hpp>
@@ -45,14 +47,14 @@ public:
   };
 
   /**
-   * @brief Create a new empty .TorrentFile.
+   * @brief Create a new empty TorrentFile.
    */
   TorrentFile() = default;
 
   /**
-   * @brief Create a new .TorrentFile.
-   * @param torrentFileName The name of the .torrent-file
-   * @param torrentFilePtr A pointer (name) to the next segment of the .torrent-file
+   * @brief Create a new TorrentFile.
+   * @param torrentFileName The name of the torrent-file
+   * @param torrentFilePtr A pointer (name) to the next segment of the torrent-file
    * @param commonPrefix The common name prefix of the manifest file names included in the catalog
    * @param catalog The catalog containing the name of each file manifest
    */
@@ -62,8 +64,8 @@ public:
               const std::vector<ndn::Name>& catalog);
 
   /**
-   * @brief Create a new .TorrentFile.
-   * @param torrentFileName The name of the .torrent-file
+   * @brief Create a new TorrentFile.
+   * @param torrentFileName The name of the torrent-file
    * @param commonPrefix The common name prefix of the manifest file names included in the catalog
    * @param catalog The catalog containing the name of each file manifest
    */
@@ -72,26 +74,26 @@ public:
               const std::vector<ndn::Name>& catalog);
 
   /**
-   * @brief Create a new .TorrentFile
-   * @param block The block format of the .torrent-file
+   * @brief Create a new TorrentFile
+   * @param block The block format of the torrent-file
    */
   explicit
   TorrentFile(const Block& block);
 
   /**
-   * @brief Get the name of the .TorrentFile
+   * @brief Get the name of the TorrentFile
    */
   const Name&
   getName() const;
 
   /**
-   * @brief Get the common prefix of the file manifest names of this .torrent-file
+   * @brief Get the common prefix of the file manifest names of this torrent-file
    */
   const Name&
   getCommonPrefix() const;
 
   /**
-   * @brief Get a shared pointer to the name of the next segment of the .torrent-file.
+   * @brief Get a shared pointer to the name of the next segment of the torrent-file.
    *
    * If there is no next segment, it returns a nullptr
    */
@@ -111,10 +113,10 @@ public:
   wireDecode(const Block& wire);
 
   /**
-   * @brief Finalize .torrent-file before signing the data packet
+   * @brief Finalize torrent-file before signing the data packet
    *
    * This method has to be called (every time) right before signing or encoding
-   * the .torrent-file
+   * the torrent-file
    */
   void
   finalize();
@@ -137,9 +139,33 @@ public:
   size_t
   catalogSize() const;
 
+  /**
+   * @brief Given a directory path for the torrent file, it generates the torrent file
+   *
+   * @param directoryPath The path to the directory for which we are to create a torrent-file
+   * @param torrentFilePrefix The prefix to be used for the name of this torrent-file
+   * @param namesPerSegment The number of manifest names to be included in each segment of the
+   *        torrent-file
+   * @param returnData Determines whether the data would be returned in memory or it will be
+   *        stored on disk without being returned
+   *
+   * Generates the torrent-file for the directory at the specified 'directoryPath',
+   * splitting the torrent-file into multiple segments, each one of which contains
+   * at most 'namesPerSegment' number of manifest names
+   *
+   **/
+  static std::pair<std::vector<TorrentFile>,
+            std::vector<std::pair<std::vector<FileManifest>,
+                                  std::vector<Data>>>>
+  generate(const std::string& directoryPath,
+           size_t namesPerSegment,
+           size_t subManifestSize,
+           size_t dataPacketSize,
+           bool returnData = false);
+
 protected:
   /**
-   * @brief prepend .torrent file as a Content block to the encoder
+   * @brief prepend torrent file as a Content block to the encoder
    */
   template<encoding::Tag TAG>
   size_t
@@ -153,7 +179,7 @@ protected:
 
 private:
   /**
-   * @brief Check whether the .torrent-file has a pointer to the next segment
+   * @brief Check whether the torrent-file has a pointer to the next segment
    */
   bool
   hasTorrentFilePtr() const;
@@ -172,7 +198,7 @@ private:
    * @brief Construct the catalog of long names from a catalog of suffixes for the file
    *        manifests' name
    *
-   * After decoding a .torrent-file from its wire format, we construct the catalog of
+   * After decoding a torrent-file from its wire format, we construct the catalog of
    * long names from the decoded common prefix and suffixes
    *
    */
@@ -184,6 +210,12 @@ private:
    */
   void
   insertToSuffixCatalog(const PartialName& suffix);
+
+  /**
+   * @brief Set the pointer of the current torrent-file segment to the next segment
+   */
+  void
+  setTorrentFilePtr(const Name& ptrName);
 
 private:
   Name m_commonPrefix;
@@ -221,6 +253,25 @@ TorrentFile::insertToSuffixCatalog(const PartialName& suffix)
 {
   m_suffixCatalog.push_back(suffix);
 }
+
+inline void
+TorrentFile::setTorrentFilePtr(const Name& ptrName)
+{
+  m_torrentFilePtr = ptrName;
+}
+
+inline const Name&
+TorrentFile::getName() const
+{
+  return Data::getName();
+}
+
+inline const Name&
+TorrentFile::getCommonPrefix() const
+{
+  return m_commonPrefix;
+}
+
 
 } // namespace ntorrent
 
