@@ -42,13 +42,6 @@ FileManifest::wireDecode(const Block& wire)
   this->decodeContent();
 }
 
-const Block&
-FileManifest::wireEncode()
-{
-  encodeContent();
-  return Data::wireEncode();
-}
-
 template<ndn::encoding::Tag TAG>
 size_t
 FileManifest::encodeContent(ndn::EncodingImpl<TAG>& encoder) const {
@@ -124,6 +117,12 @@ FileManifest::remove(const ndn::Name& name) {
   }
   m_catalog.erase(it);
   return true;
+}
+
+void
+FileManifest::finalize() {
+  m_catalog.shrink_to_fit();
+  encodeContent();
 }
 
 void FileManifest::encodeContent() {

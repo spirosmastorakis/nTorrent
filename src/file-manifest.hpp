@@ -144,9 +144,15 @@ class FileManifest : public Data {
   * @param wire the write to be decoded
   * @throws Error if decoding fails
   */
-  const Block&
-  wireEncode();
-  /// Encodes this FileManifest into the wire format and returns a Block with the contents
+
+  void
+  finalize();
+  /*
+   * \brief Performs all final processing on this manifest
+   *
+   * This method should be called once this manifest is populated and *must* be called before
+   * signing it or  calling wireEncode().
+   */
 
 private:
   void
@@ -204,6 +210,11 @@ FileManifest::FileManifest(
 
 inline
 FileManifest::FileManifest(const Block& block)
+: Data()
+, m_dataPacketSize(0)
+, m_catalogPrefix("")
+, m_catalog()
+, m_submanifestPtr(nullptr)
 {
   wireDecode(block);
 }

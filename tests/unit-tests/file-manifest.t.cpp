@@ -270,19 +270,21 @@ BOOST_AUTO_TEST_CASE(CheckEncodeDecode)
                   std::make_shared<Name>("/file0/1/5E6F7G8H"));
 
   KeyChain keyChain;
+  m1.finalize();
   keyChain.sign(m1);
   BOOST_CHECK_EQUAL(m1, FileManifest(m1.wireEncode()));
 
   // Change value and be sure that wireEncoding still works
   m1.remove("/foo/2/CAFEBABE");
+  m1.finalize();
   keyChain.sign(m1);
-
   BOOST_CHECK_EQUAL(m1, FileManifest(m1.wireEncode()));
 
   // Explicitly call wireEncode and ensure the value works
   FileManifest m2 = m1;
   m1.remove("/foo/0/ABC123");
   keyChain.sign(m1);
+  m1.finalize();
   m2.wireDecode(m1.wireEncode());
   BOOST_CHECK_EQUAL(m1, m2);
 }
