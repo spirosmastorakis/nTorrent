@@ -111,10 +111,13 @@ public:
   wireDecode(const Block& wire);
 
   /**
-   * @brief Encode from wire format
+   * @brief Finalize .torrent-file before signing the data packet
+   *
+   * This method has to be called (every time) right before signing or encoding
+   * the .torrent-file
    */
-  const Block&
-  wireEncode();
+  void
+  finalize();
 
   /**
    * @brief Insert a name to the catalog of file manifest names

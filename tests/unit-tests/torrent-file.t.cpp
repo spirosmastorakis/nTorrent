@@ -146,6 +146,7 @@ BOOST_AUTO_TEST_CASE(CheckEncodeDecode)
                    {"/NTORRENT/linux15.01/file0/1A2B3C4D",
                    "/NTORRENT/linux15.01/file1/2A3B4C5E"});
 
+  file.finalize();
   KeyChain keyChain;
   keyChain.sign(file);
 
@@ -169,6 +170,7 @@ BOOST_AUTO_TEST_CASE(CheckEncodeDecodeNoTorrentFilePtr)
                    {"/NTORRENT/linux15.01/file0/1A2B3C4D",
                    "/NTORRENT/linux15.01/file1/2A3B4C5E"});
 
+  file.finalize();
   KeyChain keyChain;
   keyChain.sign(file);
 
@@ -190,6 +192,7 @@ BOOST_AUTO_TEST_CASE(CheckEncodeDecodeEmptyTorrentFile)
                   "",
                   {});
 
+  file.finalize();
   KeyChain keyChain;
   keyChain.sign(file);
 
@@ -209,6 +212,7 @@ BOOST_AUTO_TEST_CASE(CheckEncodeDecodeEmptyCatalog)
                   "/NTORRENT/linux15.01",
                   {});
 
+  file.finalize();
   KeyChain keyChain;
   keyChain.sign(file);
 
@@ -260,6 +264,7 @@ BOOST_AUTO_TEST_CASE(TestInsertAndEncodeTwice)
                    {"/NTORRENT/linux15.01/file0/1A2B3C4D",
                    "/NTORRENT/linux15.01/file1/2A3B4C5E"});
 
+  file.finalize();
   KeyChain keyChain;
   keyChain.sign(file);
   Block wire = file.wireEncode();
@@ -270,6 +275,7 @@ BOOST_AUTO_TEST_CASE(TestInsertAndEncodeTwice)
 
   file.insert("/NTORRENT/linux15.01/file3/AB34C5KA");
   file.insert("/NTORRENT/linux15.01/file4/CB24C3GB");
+  file.finalize();
   Block wire2 = file.wireEncode();
 
   file2.wireDecode(wire2);

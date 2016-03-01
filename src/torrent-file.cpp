@@ -227,13 +227,12 @@ TorrentFile::wireDecode(const Block& wire)
   this->constructLongNames();
 }
 
-const Block&
-TorrentFile::wireEncode()
+void
+TorrentFile::finalize()
 {
   this->createSuffixCatalog();
   this->encodeContent();
   m_suffixCatalog.clear();
-  return Data::wireEncode();
 }
 
 } // namespace ntorrent
