@@ -39,7 +39,7 @@ class FetchingStrategyManager {
      * @brief Class Destructor
      */
     virtual
-    ~FetchingStrategyManager() = default;
+    ~FetchingStrategyManager();
 
     /**
      * @brief Method called to start the torrent downloading
@@ -86,6 +86,11 @@ class FetchingStrategyManager {
     virtual void
     onManifestReceived(const std::vector<Name>& packetNames) = 0;
 };
+
+inline
+FetchingStrategyManager::~FetchingStrategyManager()
+{
+}
 
 } // namespace ntorrent
 } // namespace ndn
