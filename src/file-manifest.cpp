@@ -32,6 +32,8 @@
 #include <ndn-cxx/security/key-chain.hpp>
 #include <ndn-cxx/security/signing-helpers.hpp>
 
+#include <ndn-cxx/encoding/tlv.hpp>
+
 using std::vector;
 using std::streamsize;
 using boost::irange;
@@ -219,9 +221,6 @@ FileManifest::wireDecode(const Block& wire)
 template<ndn::encoding::Tag TAG>
 size_t
 FileManifest::encodeContent(ndn::EncodingImpl<TAG>& encoder) const {
-  // FileManifestName ::= NAME-TYPE TLV-LENGTH
-  //                  Name
-
   // ManifestContent ::= CONTENT-TYPE TLV-LENGTH
   //                 DataPacketName*
   //                 CatalogPrefix
@@ -234,7 +233,7 @@ FileManifest::encodeContent(ndn::EncodingImpl<TAG>& encoder) const {
   // CatalogPrefix ::= NAME-TYPE TLV-LENGTH
   //               Name
 
-  // DataPacketSize ::= CONTENT-TYPE TLV-LENGTH
+    // DataPacketSize ::= CONTENT-TYPE TLV-LENGTH
   //                nonNegativeInteger
 
   // FileManifestPtr ::= NAME-TYPE TLV-LENGTH
@@ -242,6 +241,7 @@ FileManifest::encodeContent(ndn::EncodingImpl<TAG>& encoder) const {
 
   size_t totalLength = 0;
 
+  // build suffix catalog
   vector<Name> suffixCatalog;
   suffixCatalog.reserve(m_catalog.size());
   for (auto name: m_catalog) {
@@ -355,16 +355,11 @@ FileManifest::decodeContent() {
   content.parse();
 
   auto element = content.elements_begin();
-
   if (content.elements_end() == element) {
     BOOST_THROW_EXCEPTION(Error("FileManifest with empty content"));
   }
-
-  element->parse();
-  Name name(*element);
-
-  // Submanifest ptr
-  if (!name.empty()) {
+  if (element->type() == tlv::Name) {
+    Name name(*element);
     m_submanifestPtr = std::make_shared<Name>(name);
     ++element;
   }
@@ -372,16 +367,14 @@ FileManifest::decodeContent() {
   // DataPacketSize
   m_dataPacketSize = readNonNegativeInteger(*element);
   ++element;
-
   // CatalogPrefix
   m_catalogPrefix = Name(*element);
-  element++;
-
+  ++element;
   // Catalog
   m_catalog.clear();
   for (; element != content.elements_end(); ++element) {
     element->parse();
-    name = m_catalogPrefix;
+    Name name = m_catalogPrefix;
     name.append(Name(*element));
     if (name == m_catalogPrefix) {
       BOOST_THROW_EXCEPTION(Error("Empty name included in a FileManifest"));

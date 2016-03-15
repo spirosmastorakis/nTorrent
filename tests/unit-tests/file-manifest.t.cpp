@@ -28,6 +28,7 @@
 #include <ndn-cxx/security/key-chain.hpp>
 #include <ndn-cxx/security/signing-helpers.hpp>
 #include <ndn-cxx/signature.hpp>
+#include <ndn-cxx/util/io.hpp>
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -38,6 +39,7 @@ namespace fs = boost::filesystem;
 BOOST_TEST_DONT_PRINT_LOG_VALUE(std::nullptr_t)
 BOOST_TEST_DONT_PRINT_LOG_VALUE(std::vector<ndn::Name>)
 BOOST_TEST_DONT_PRINT_LOG_VALUE(std::vector<ndn::ntorrent::FileManifest>)
+BOOST_TEST_DONT_PRINT_LOG_VALUE(std::vector<ndn::ntorrent::FileManifest>::iterator)
 BOOST_TEST_DONT_PRINT_LOG_VALUE(std::vector<uint8_t>)
 BOOST_TEST_DONT_PRINT_LOG_VALUE(std::vector<ndn::Data>::iterator)
 
@@ -166,8 +168,17 @@ BOOST_AUTO_TEST_CASE(CheckAssignmentOperatorEqaulityAndCopyCtor)
 {
   // Construct two manifests with the same attributes, and check that they related equal
   {
-    FileManifest m1("/file0/1A2B3C4D", 256, "/foo/", vector<Name>({}), std::make_shared<Name>("/file0/1/5E6F7G8H"));
-    FileManifest m2("/file0/1A2B3C4D", 256, "/foo/", vector<Name>({}), std::make_shared<Name>("/file0/1/5E6F7G8H"));
+    FileManifest m1("/file0/1A2B3C4D",
+                    256,
+                    "/foo/",
+                    vector<Name>({}),
+                    std::make_shared<Name>("/file0/1/5E6F7G8H"));
+
+    FileManifest m2("/file0/1A2B3C4D",
+                    256,
+                    "/foo/",
+                    vector<Name>({}),
+                    std::make_shared<Name>("/file0/1/5E6F7G8H"));
 
     BOOST_CHECK_EQUAL(m1, m2);
     BOOST_CHECK(!(m1 != m2));
@@ -273,30 +284,42 @@ BOOST_AUTO_TEST_CASE(CheckAssignmentOperatorEqaulityAndCopyCtor)
 BOOST_AUTO_TEST_CASE(CheckEncodeDecode)
 {
   // Construct new FileManifest from  wire encoding of another FileManifest
-  FileManifest m1("/file0/1A2B3C4D",
-                  256,
-                  "/foo/",
-                  {"/foo/0/ABC123",  "/foo/1/DEADBEFF", "/foo/2/CAFEBABE"},
-                  std::make_shared<Name>("/file0/1/5E6F7G8H"));
+  {
+    FileManifest m1("/file0/1A2B3C4D",
+                    256,
+                    "/foo/",
+                    {"/foo/0/ABC123",  "/foo/1/DEADBEFF", "/foo/2/CAFEBABE"},
+                    std::make_shared<Name>("/file0/1/5E6F7G8H"));
 
-  KeyChain keyChain;
-  m1.finalize();
-  keyChain.sign(m1);
-  BOOST_CHECK_EQUAL(m1, FileManifest(m1.wireEncode()));
+    KeyChain keyChain;
+    m1.finalize();
+    keyChain.sign(m1);
+    BOOST_CHECK_EQUAL(m1, FileManifest(m1.wireEncode()));
 
-  // Change value and be sure that wireEncoding still works
-  m1.remove("/foo/2/CAFEBABE");
-  m1.finalize();
-  keyChain.sign(m1);
-  BOOST_CHECK_EQUAL(m1, FileManifest(m1.wireEncode()));
+    // Change value and be sure that wireEncoding still works
+    m1.remove("/foo/2/CAFEBABE");
+    m1.finalize();
+    keyChain.sign(m1);
+    BOOST_CHECK_EQUAL(m1, FileManifest(m1.wireEncode()));
 
-  // Explicitly call wireEncode and ensure the value works
-  FileManifest m2 = m1;
-  m1.remove("/foo/0/ABC123");
-  keyChain.sign(m1);
-  m1.finalize();
-  m2.wireDecode(m1.wireEncode());
-  BOOST_CHECK_EQUAL(m1, m2);
+    // Explicitly call wireEncode and ensure the value works
+    FileManifest m2 = m1;
+    m1.remove("/foo/0/ABC123");
+    keyChain.sign(m1);
+    m1.finalize();
+    m2.wireDecode(m1.wireEncode());
+    BOOST_CHECK_EQUAL(m1, m2);
+  }
+  {
+    FileManifest m1("/file0/1A2B3C4D",
+                    256,
+                    "/foo/",
+                    {"/foo/0/ABC123",  "/foo/1/DEADBEFF", "/foo/2/CAFEBABE"});
+    KeyChain keyChain;
+    m1.finalize();
+    keyChain.sign(m1);
+    BOOST_CHECK_EQUAL(m1, FileManifest(m1.wireEncode()));
+  }
 }
 
 BOOST_AUTO_TEST_CASE(CheckGenerateFileManifest)
@@ -319,10 +342,10 @@ BOOST_AUTO_TEST_CASE(CheckGenerateFileManifest)
     {1024         , 1            , "tests/testdata/foo/bar1.txt", "/NTORRENT/foo/", true, false },
     {1024         , 100          , "tests/testdata/foo/bar1.txt", "/NTORRENT/foo/", true, false },
     {TEST_FILE_LEN, 1            , "tests/testdata/foo/bar.txt" , "/NTORRENT/foo/", true, false },
-      // Negative tests
-      //   non-existent file
+    // Negative tests
+    //   non-existent file
     {128          , 128          , "tests/testdata/foo/fake.txt", "/NTORRENT/foo/", false, true },
-      // prefix mismatch
+    //   // prefix mismatch
     {128          , 128          , "tests/testdata/foo/bar.txt", "/NTORRENT/bar/",  false, true },
     //  scaling test
     // {10240         , 5120 ,         "tests/testdata/foo/huge_file", "/NTORRENT/foo/", false, false },
@@ -354,15 +377,22 @@ BOOST_AUTO_TEST_CASE(CheckGenerateFileManifest)
                                                  subManifestSize,
                                                  dataPacketSize,
                                                  getData);
+      auto fileSize = fs::file_size(filePath);
+      auto EXP_NUM_DATA_PACKETS   = fileSize / dataPacketSize + !!(fileSize % dataPacketSize);
+      auto EXP_NUM_FILE_MANIFESTS = EXP_NUM_DATA_PACKETS / subManifestSize +
+                                    !!(EXP_NUM_DATA_PACKETS % subManifestSize);
       auto manifests = manifestsDataPair.first;
       auto data = manifestsDataPair.second;
+
       // Verify the basic attributes of the manifest
-      size_t file_length = 0;
+      BOOST_CHECK_EQUAL(manifests.size(), EXP_NUM_FILE_MANIFESTS);
       for (auto it = manifests.begin(); it != manifests.end(); ++it) {
         // Verify that each file manifest is signed.
         BOOST_CHECK_NO_THROW(it->getFullName());
         BOOST_CHECK_EQUAL(it->data_packet_size(), dataPacketSize);
         BOOST_CHECK_EQUAL(it->catalog_prefix(), catalogPrefix);
+        auto block = it->wireEncode();
+        BOOST_CHECK_EQUAL(*it, FileManifest(block));
         if (it != manifests.end() -1) {
           BOOST_CHECK_EQUAL(it->catalog().size(), subManifestSize);
           BOOST_CHECK_EQUAL(*(it->submanifest_ptr()), (it+1)->getFullName());
@@ -370,34 +400,55 @@ BOOST_AUTO_TEST_CASE(CheckGenerateFileManifest)
         else {
           BOOST_CHECK_LE(it->catalog().size(), subManifestSize);
           BOOST_CHECK_EQUAL(it->submanifest_ptr(), nullptr);
-          file_length += it->wireEncode().value_size();
         }
+      }
+      // test that we can write the manifest to the disk and read it out again
+      {
+        std::string dirPath = "tests/testdata/temp/";
+        boost::filesystem::create_directory(dirPath);
+        auto fileNum = 0;
+        for (auto &m : manifests) {
+          fileNum++;
+          auto filename = dirPath + to_string(fileNum);
+          io::save(m, filename);
+        }
+        // read them back out
+        fileNum = 0;
+        for (auto &m : manifests) {
+          fileNum++;
+          auto filename = dirPath + to_string(fileNum);
+          auto manifest_ptr = io::load<FileManifest>(filename);
+          BOOST_CHECK_NE(manifest_ptr, nullptr);
+          BOOST_CHECK_EQUAL(m, *manifest_ptr);
+        }
+        fs::remove_all(dirPath);
       }
       // confirm the manifests catalogs includes exactly the data packets
       if (getData) {
+        BOOST_CHECK_EQUAL(EXP_NUM_DATA_PACKETS, data.size());
         auto data_it = data.begin();
         size_t total_manifest_length = 0;
         for (auto& m : manifests) {
           total_manifest_length += m.wireEncode().value_size();
           for (auto& data_name : m.catalog()) {
             BOOST_CHECK_EQUAL(data_name, data_it->getFullName());
-            data_it++;
+            ++data_it;
           }
         }
         BOOST_CHECK_EQUAL(data_it, data.end());
         std::vector<uint8_t> data_bytes;
-        data_bytes.reserve(fs::file_size(filePath));
+        data_bytes.reserve(fileSize);
         for (const auto& d : data) {
           auto content = d.getContent();
           data_bytes.insert(data_bytes.end(), content.value_begin(), content.value_end());
         }
         data_bytes.shrink_to_fit();
-        // load  the contents of the file from disk
+        // load the contents of the file from disk
         fs::ifstream is(filePath, fs::ifstream::binary | fs::ifstream::in);
         is >> std::noskipws;
         std::istream_iterator<uint8_t> start(is), end;
         std::vector<uint8_t> file_bytes;
-        file_bytes.reserve(fs::file_size(filePath));
+        file_bytes.reserve(fileSize);
         file_bytes.insert(file_bytes.begin(), start, end);
         file_bytes.shrink_to_fit();
         BOOST_CHECK_EQUAL(file_bytes, data_bytes);

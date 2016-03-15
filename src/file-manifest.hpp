@@ -87,7 +87,7 @@ class FileManifest : public Data {
    */
 
   // CREATORS
-  FileManifest() = delete;
+  FileManifest() = default;
 
   ~FileManifest() = default;
   /// Destroy this object
