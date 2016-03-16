@@ -368,15 +368,15 @@ BOOST_AUTO_TEST_CASE(TestTorrentFileGenerator)
       auto manifestPairs2 = torrentFilePair2.second;
 
       // Check that generate has not returned any data packets unless otherwise specified
-      for (auto i = manifestPairs1.begin(); i != manifestPairs1.end(); ++i) {
-        BOOST_CHECK_EQUAL((*i).second.size(), 0);
+      for (auto j = manifestPairs1.begin(); j != manifestPairs1.end(); ++j) {
+        BOOST_CHECK_EQUAL((*j).second.size(), 0);
       }
 
       Name directoryPathName(directoryPath);
       fs::recursive_directory_iterator directoryPtr(fs::system_complete(directoryPath).string());
       int numberOfDirectoryFiles = 0;
-      for (fs::recursive_directory_iterator i = directoryPtr;
-           i != fs::recursive_directory_iterator(); ++i) {
+      for (fs::recursive_directory_iterator j = directoryPtr;
+           j != fs::recursive_directory_iterator(); ++j) {
         numberOfDirectoryFiles++;
       }
       // Verify the basic attributes of the torrent-file
@@ -405,8 +405,8 @@ BOOST_AUTO_TEST_CASE(TestTorrentFileGenerator)
       }
 
       std::vector<uint8_t> dataBytes;
-      for (auto i = manifestPairs2.begin() ; i != manifestPairs2.end(); ++i) {
-        for (auto d : (*i).second) {
+      for (auto j = manifestPairs2.begin() ; j != manifestPairs2.end(); ++j) {
+        for (auto d : (*j).second) {
           auto content = d.getContent();
           dataBytes.insert(dataBytes.end(), content.value_begin(), content.value_end());
         }
@@ -414,10 +414,10 @@ BOOST_AUTO_TEST_CASE(TestTorrentFileGenerator)
       // load  the contents of the directory files from disk
       std::vector<uint8_t> directoryFilesBytes;
       fs::recursive_directory_iterator directoryPtr2(fs::system_complete(directoryPath).string());
-      for (fs::recursive_directory_iterator i = directoryPtr2;
-           i != fs::recursive_directory_iterator();
-           ++i) {
-        fs::ifstream is((*i), fs::ifstream::binary | fs::ifstream::in);
+      for (fs::recursive_directory_iterator j = directoryPtr2;
+           j != fs::recursive_directory_iterator();
+           ++j) {
+        fs::ifstream is((*j), fs::ifstream::binary | fs::ifstream::in);
         is >> std::noskipws;
         std::istream_iterator<uint8_t> start(is), end;
         std::vector<uint8_t> fileBytes(start, end);
