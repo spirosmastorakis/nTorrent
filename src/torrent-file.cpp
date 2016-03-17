@@ -284,12 +284,14 @@ TorrentFile::generate(const std::string& directoryPath,
 
   // Sign and append the last torrent-file
   security::KeyChain keyChain;
+  currentTorrentFile.finalize();
   keyChain.sign(currentTorrentFile, signingWithSha256());
   torrentSegments.push_back(currentTorrentFile);
 
   for (auto it = torrentSegments.rbegin() + 1; it != torrentSegments.rend(); ++it) {
     auto next = it - 1;
     it->setTorrentFilePtr(next->getFullName());
+    it->finalize();
     keyChain.sign(*it, signingWithSha256());
   }
 

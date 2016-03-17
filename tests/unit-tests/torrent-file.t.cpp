@@ -27,12 +27,15 @@
 #include <ndn-cxx/data.hpp>
 #include <ndn-cxx/signature.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
+#include <ndn-cxx/util/io.hpp>
 
 #include <boost/range/adaptors.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
 namespace fs = boost::filesystem;
+
+BOOST_TEST_DONT_PRINT_LOG_VALUE(std::nullptr_t)
 
 namespace ndn {
 
@@ -387,6 +390,7 @@ BOOST_AUTO_TEST_CASE(TestTorrentFileGenerator)
                           Name("/NTORRENT" +
                                directoryPathName.getSubName(
                                  directoryPathName.size() - 1).toUri()));
+        BOOST_CHECK_EQUAL(*it, TorrentFile(it->wireEncode()));
         if (it != torrentFileSegments.end() - 1) {
           BOOST_CHECK_EQUAL(it->getCatalog().size(), namesPerSegment);
           BOOST_CHECK_EQUAL(*(it->getTorrentFilePtr()), (it+1)->getFullName());
@@ -426,6 +430,27 @@ BOOST_AUTO_TEST_CASE(TestTorrentFileGenerator)
       // confirm that they are equal
       BOOST_CHECK_EQUAL_COLLECTIONS(directoryFilesBytes.begin(), directoryFilesBytes.end(),
                                     dataBytes.begin(), dataBytes.end());
+      // test that we can write the torrent file to the disk and read it out again
+      {
+        std::string dirPath = "tests/testdata/temp/";
+        boost::filesystem::create_directory(dirPath);
+        auto fileNum = 0;
+        for (auto &s : torrentFileSegments) {
+          fileNum++;
+          auto filename = dirPath + to_string(fileNum);
+          io::save(s, filename);
+        }
+        // read them back out
+        fileNum = 0;
+        for (auto &s : torrentFileSegments) {
+          fileNum++;
+          auto filename = dirPath + to_string(fileNum);
+          auto torrent_ptr = io::load<TorrentFile>(filename);
+          BOOST_CHECK_NE(torrent_ptr, nullptr);
+          BOOST_CHECK_EQUAL(s, *torrent_ptr);
+        }
+        fs::remove_all(dirPath);
+      }
     }
   }
 }

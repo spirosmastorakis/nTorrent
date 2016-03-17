@@ -391,8 +391,7 @@ BOOST_AUTO_TEST_CASE(CheckGenerateFileManifest)
         BOOST_CHECK_NO_THROW(it->getFullName());
         BOOST_CHECK_EQUAL(it->data_packet_size(), dataPacketSize);
         BOOST_CHECK_EQUAL(it->catalog_prefix(), catalogPrefix);
-        auto block = it->wireEncode();
-        BOOST_CHECK_EQUAL(*it, FileManifest(block));
+        BOOST_CHECK_EQUAL(*it, FileManifest(it->wireEncode()));
         if (it != manifests.end() -1) {
           BOOST_CHECK_EQUAL(it->catalog().size(), subManifestSize);
           BOOST_CHECK_EQUAL(*(it->submanifest_ptr()), (it+1)->getFullName());
