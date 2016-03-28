@@ -275,7 +275,7 @@ TorrentFile::generate(const std::string& directoryPath,
       currentTorrentName.appendSequenceNumber(static_cast<int>(manifestFileCounter));
       currentTorrentFile = TorrentFile(currentTorrentName, commonPrefix, {});
     }
-    currentTorrentFile.insert(currentManifestPair.first[0].getName());
+    currentTorrentFile.insert(currentManifestPair.first[0].getFullName());
     currentManifestPair.first.shrink_to_fit();
     currentManifestPair.second.shrink_to_fit();
     manifestPairs.push_back(currentManifestPair);

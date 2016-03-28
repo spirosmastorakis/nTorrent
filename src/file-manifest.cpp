@@ -63,7 +63,7 @@ get_name_of_manifest(const std::string& filePath, const Name& manifestPrefix)
                                               manifestPrefix.toUri() + " and "     +
                                               full_path.toUri()));
   }
-  ndn::Name manifestName;
+  ndn::Name manifestName = "/NTORRENT/";
   // Rebuild the name to be the suffix from the matching component
   for (auto it = (name_component_iter.base() - 1); full_path.end() != it; ++it) {
     manifestName.append(*it);
@@ -72,7 +72,7 @@ get_name_of_manifest(const std::string& filePath, const Name& manifestPrefix)
 }
 
 static std::vector<Data>
-packetize_file(const fs::path& filePath,
+packetize_file(const fs::path&  filePath,
                const ndn::Name& commonPrefix,
                size_t dataPacketSize,
                size_t subManifestSize,
@@ -111,7 +111,6 @@ packetize_file(const fs::path& filePath,
     fs.read(&file_bytes.front(), buffer_size);
     auto read_size = fs.gcount();
     if (fs.bad() || read_size < 0) {
-
       BOOST_THROW_EXCEPTION(FileManifest::Error("IO Error when reading" + filePath.string()));
     }
     bytes_read += read_size;
@@ -174,14 +173,11 @@ FileManifest::generate(const std::string& filePath,
   manifests.reserve(numSubManifests);
   for (auto subManifestNum : irange<size_t>(0, numSubManifests)) {
     auto curr_manifest_name = manifestName;
-    curr_manifest_name.append("manifest" + boost::lexical_cast<std::string>(subManifestNum));
     // append the packet number
     curr_manifest_name.appendSequenceNumber(manifests.size());
-    auto subManifestPrefix = manifestPrefix;
-    subManifestPrefix.appendNumber(subManifestNum);
     FileManifest curr_manifest(curr_manifest_name, dataPacketSize, manifestPrefix);
     auto packets = packetize_file(path,
-                                  subManifestPrefix,
+                                  curr_manifest_name,
                                   dataPacketSize,
                                   subManifestSize,
                                   subManifestNum);
