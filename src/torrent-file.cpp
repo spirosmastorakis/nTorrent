@@ -257,15 +257,17 @@ TorrentFile::generate(const std::string& directoryPath,
   Name torrentName(commonPrefix.toUri() + "/torrent-file");
   TorrentFile currentTorrentFile(torrentName, commonPrefix, {});
   std::vector<std::pair<std::vector<FileManifest>, std::vector<Data>>> manifestPairs;
-
+  // sort all the file names lexicographically
+  std::set<std::string> fileNames;
+  for (auto i = directoryPtr; i != fs::recursive_directory_iterator(); ++i) {
+    fileNames.insert(i->path().string());
+  }
   size_t manifestFileCounter = 0u;
-  for (fs::recursive_directory_iterator i = directoryPtr;
-       i != fs::recursive_directory_iterator();
-       ++i) {
+  for (const auto& fileName : fileNames) {
     Name manifestPrefix("/NTORRENT" +
                         directoryPathName.getSubName(directoryPathName.size() - 1).toUri());
     std::pair<std::vector<FileManifest>, std::vector<Data>> currentManifestPair =
-                                                    FileManifest::generate((*i).path().string(),
+                                                    FileManifest::generate(fileName,
                                                     manifestPrefix, subManifestSize,
                                                     dataPacketSize, returnData);
 

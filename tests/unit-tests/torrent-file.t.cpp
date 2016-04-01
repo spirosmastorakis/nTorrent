@@ -418,10 +418,13 @@ BOOST_AUTO_TEST_CASE(TestTorrentFileGenerator)
       // load  the contents of the directory files from disk
       std::vector<uint8_t> directoryFilesBytes;
       fs::recursive_directory_iterator directoryPtr2(fs::system_complete(directoryPath).string());
-      for (fs::recursive_directory_iterator j = directoryPtr2;
-           j != fs::recursive_directory_iterator();
-           ++j) {
-        fs::ifstream is((*j), fs::ifstream::binary | fs::ifstream::in);
+
+      std::set<std::string> fileNames;
+      for (auto j = directoryPtr2; j != fs::recursive_directory_iterator(); ++j)  {
+        fileNames.insert(j->path().string());
+      }
+      for (const auto& fileName : fileNames) {
+        fs::ifstream is(fileName, fs::ifstream::binary | fs::ifstream::in);
         is >> std::noskipws;
         std::istream_iterator<uint8_t> start(is), end;
         std::vector<uint8_t> fileBytes(start, end);
