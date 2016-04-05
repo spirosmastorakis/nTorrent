@@ -92,6 +92,11 @@ class TorrentManager : boost::noncopyable {
   // Seed the specified 'data' to the network.
 
  protected:
+  bool writeData(const Data& packet);
+  // Write the Data packet to disk, return 'true' if data successfully written to disk 'false'
+  // otherwise. Behavior is undefined unless the corresponding file manifest has already been
+  // downloaded.
+
   void onDataReceived(const Data& data);
 
   void onInterestReceived(const Name& name);

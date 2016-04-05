@@ -24,6 +24,8 @@
 #include "torrent-manager.hpp"
 #include "torrent-file.hpp"
 
+#include <set>
+
 #include <boost/filesystem.hpp>
 
 #include <ndn-cxx/util/io.hpp>
@@ -53,7 +55,15 @@ class TestTorrentManager : public TorrentManager {
   }
 
   std::vector<bool> fileState(const ndn::Name& manifestName) {
+    auto fout = m_fileStates[manifestName].first;
+    if (nullptr != fout) {
+      fout->flush();
+    }
     return m_fileStates[manifestName].second;
+  }
+
+  bool writeData(const Data& data) {
+    return TorrentManager::writeData(data);
   }
 };
 
@@ -74,9 +84,7 @@ BOOST_AUTO_TEST_CASE(CheckInitializeComplete)
     torrentSegments = temp.first;
     auto temp1      = temp.second;
     for (const auto& ms : temp1) {
-      for (const auto& m : ms.first) {
-        manifests.push_back(m);
-      }
+      manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
     }
   }
   // write the torrent segments  and manifests to disk
@@ -177,10 +185,8 @@ BOOST_AUTO_TEST_CASE(CheckInitializeMissingManifests)
     torrentSegments = temp.first;
     auto temp1      = temp.second;
     temp1.pop_back(); // remove the manifests for the last file
-    for (const auto& ms : temp1) {
-      for (const auto& m : ms.first) {
-        manifests.push_back(m);
-      }
+    for (const  auto& ms : temp1) {
+      manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
     }
   }
   // write the torrent segments  and manifests to disk
@@ -193,7 +199,6 @@ BOOST_AUTO_TEST_CASE(CheckInitializeMissingManifests)
     fileNum++;
     auto filename = torrentPath + to_string(fileNum);
     io::save(t, filename);
-
   }
   fileNum = 0;
   auto manifestPath = dirPath + "manifests/";
@@ -221,6 +226,102 @@ BOOST_AUTO_TEST_CASE(CheckInitializeMissingManifests)
   }
   fs::remove_all(dirPath);
 }
+
+BOOST_AUTO_TEST_SUITE_END()
+
+BOOST_AUTO_TEST_SUITE(CheckTorrentManagerUtilities)
+
+BOOST_AUTO_TEST_CASE(CheckWriteDataComplete)
+{
+  vector<FileManifest> manifests;
+  vector<TorrentFile>  torrentSegments;
+  // for each file, the data packets
+  std::vector<vector<Data>> fileData;
+  std::string filePath = "tests/testdata/temp";
+  // get torrent files and manifests
+  {
+    auto temp = TorrentFile::generate("tests/testdata/foo",
+                                      1024,
+                                      1024,
+                                      1024,
+                                      true);
+    torrentSegments = temp.first;
+    auto temp1      = temp.second;
+    for (const auto& ms : temp1) {
+      manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
+      fileData.push_back(ms.second);
+    }
+  }
+  // write the torrent segments and manifests to disk
+  std::string dirPath = ".appdata/foo/";
+  boost::filesystem::create_directories(dirPath);
+  std::string torrentPath = dirPath + "torrent_files/";
+  boost::filesystem::create_directories(torrentPath);
+  auto fileNum = 0;
+  for (const auto& t : torrentSegments) {
+    fileNum++;
+    auto filename = torrentPath + to_string(fileNum);
+    io::save(t, filename);
+  }
+  fileNum = 0;
+  auto manifestPath = dirPath + "manifests/";
+  boost::filesystem::create_directory(manifestPath);
+  for (const auto& m : manifests) {
+    fileNum++;
+    auto filename = manifestPath + to_string(fileNum);
+    io::save(m, filename);
+  }
+  // Initialize manager
+  TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253",
+                             filePath);
+  manager.Initialize();
+  // check that initially there is no data on disk
+  for (auto m : manager.fileManifests()) {
+    auto fileState = manager.fileState(m.getFullName());
+    BOOST_CHECK(fileState.empty());
+  }
+  // write all data to disk (for each file manifest)
+  auto manifest_it = manifests.begin();
+  for (auto& data : fileData) {
+    for (auto& d : data) {
+      BOOST_CHECK(manager.writeData(d));
+    }
+    // check that the  state is updated appropriately
+    auto fileState = manager.fileState(manifest_it->getFullName());
+    for (auto s : fileState) {
+      BOOST_CHECK(s);
+    }
+    ++manifest_it;
+  }
+  // get the file names (ascending)
+  std::set<std::string> fileNames;
+  for (auto i = fs::recursive_directory_iterator(filePath + "/foo");
+       i != fs::recursive_directory_iterator();
+       ++i) {
+    fileNames.insert(i->path().string());
+  }
+  // verify file by file that the data packets are written correctly
+  auto f_it = fileData.begin();
+  for (auto f : fileNames) {
+    // read file from disk
+    std::vector<uint8_t> file_bytes;
+    fs::ifstream is(f, fs::ifstream::binary | fs::ifstream::in);
+    is >> std::noskipws;
+    std::istream_iterator<uint8_t> start(is), end;
+    file_bytes.insert(file_bytes.end(), start, end);
+    std::vector<uint8_t> data_bytes;
+    // get content from data packets
+    for (const auto& d : *f_it) {
+      auto content = d.getContent();
+      data_bytes.insert(data_bytes.end(), content.value_begin(), content.value_end());
+    }
+    BOOST_CHECK(data_bytes == file_bytes);
+    ++f_it;
+  }
+  fs::remove_all(filePath);
+  fs::remove_all(".appdata");
+}
+
 
 BOOST_AUTO_TEST_SUITE_END()
 

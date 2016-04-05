@@ -238,6 +238,25 @@ intializeDataPackets(const string&      filePath,
   return packets;
 }
 
+static std::pair<std::shared_ptr<fs::fstream>, std::vector<bool>>
+initializeFileState(const string& dataPath,
+                    const FileManifest& manifest)
+{
+  // construct the file name
+  const auto manifestName = manifest.name();
+  auto fileName = manifestName.getSubName(1, manifestName.size() - 2).toUri();
+  auto filePath = dataPath + fileName;
+  vector<bool> fileBitMap(manifest.catalog().size());
+  auto fbits = fs::fstream::out | fs::fstream::binary;
+  // if file exists, use in O/W use concatenate mode
+  fbits |= fs::exists(filePath) ? fs::fstream::in : fs::fstream::ate;
+  auto s = std::make_shared<fs::fstream>(filePath, fbits);
+  if (!*s) {
+    BOOST_THROW_EXCEPTION(io::Error("Cannot open: " + dataPath));
+  }
+  return std::make_pair(s, fileBitMap);
+}
+
 void TorrentManager::Initialize()
 {
   // .../<torrent_name>/torrent-file/<implicit_digest>
@@ -265,29 +284,28 @@ void TorrentManager::Initialize()
     }
     // construct the file name
     auto fileName = m.name().getSubName(1, m.name().size() - 2).toUri();
-    auto filePath = m_dataPath + fileName;
+    fs::path filePath = m_dataPath + fileName;
     // If there are any valid packets, add corresponding state to manager
-    auto packets = intializeDataPackets(filePath, m, *currTorrentFile_it);
+    if (!fs::exists(filePath)) {
+      boost::filesystem::create_directories(filePath.parent_path());
+      continue;
+    }
+    auto packets = intializeDataPackets(filePath.string(), m, *currTorrentFile_it);
     if (!packets.empty()) {
-      // build the bit map
-      auto catalog =  m.catalog();
-      vector<bool> fileBitMap(catalog.size());
+      m_fileStates[m.getFullName()] = initializeFileState(m_dataPath, m);
+      auto& fileBitMap = m_fileStates[m.getFullName()].second;
       auto read_it = packets.begin();
       size_t i = 0;
-      for (auto name : catalog) {
+      for (auto name : m.catalog()) {
         if (name == read_it->getFullName()) {
           ++read_it;
-          fileBitMap[i]= true;
+          fileBitMap[i] = true;
         }
         ++i;
       }
       for (const auto& d : packets) {
         seed(d);
       }
-      auto s = std::make_shared<fs::fstream>(filePath, fs::fstream::binary
-                                                     | fs::fstream::in
-                                                     | fs::fstream::out);
-      m_fileStates[m.getFullName()] = std::make_pair(s, fileBitMap);
     }
   }
   for (const auto& t : m_torrentSegments) {
@@ -296,7 +314,45 @@ void TorrentManager::Initialize()
   for (const auto& m : m_fileManifests) {
     seed(m);
   }
+}
 
+bool TorrentManager::writeData(const Data& packet)
+{
+  // find correct manifest
+  const auto& packetName = packet.getName();
+  auto manifest_it = std::find_if(m_fileManifests.begin(), m_fileManifests.end(),
+                                 [&packetName](const FileManifest& m) {
+                                   return m.getName().isPrefixOf(packetName);
+                                 });
+  if (m_fileManifests.end() == manifest_it) {
+    return false;
+  }
+  // get file state out
+  auto& fileState = m_fileStates[manifest_it->getFullName()];
+  // if there is no open stream to the file
+  if (nullptr == fileState.first) {
+    fileState = initializeFileState(m_dataPath, *manifest_it);
+  }
+  auto packetNum = packetName.get(packet.getName().size() - 1).toSequenceNumber();
+  // if we already have the packet, do not rewrite it.
+  if (fileState.second[packetNum]) {
+    return false;
+  }
+  auto packetOffset = packetNum * manifest_it->data_packet_size();
+  // write data to disk
+  fileState.first->seekg(packetOffset);
+  try {
+    auto content = packet.getContent();
+    std::vector<char> data(content.value_begin(), content.value_end());
+    fileState.first->write(&data[0], data.size());
+  }
+  catch (io::Error &e) {
+    std::cerr << e.what() << std::endl;
+    return false;
+  }
+  // update bitmap
+  fileState.second[packetNum] = true;
+  return true;
 }
 
 void TorrentManager::seed(const Data& data) const {
