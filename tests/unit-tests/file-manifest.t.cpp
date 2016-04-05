@@ -345,11 +345,11 @@ BOOST_AUTO_TEST_CASE(CheckGenerateFileManifest)
     // Negative tests
     //   non-existent file
     {128          , 128          , "tests/testdata/foo/fake.txt", "/NTORRENT/foo/", false, true },
-    //   // prefix mismatch
+    // prefix mismatch
     {128          , 128          , "tests/testdata/foo/bar.txt", "/NTORRENT/bar/",  false, true },
-    //  scaling test
+    // scaling test
     // {10240         , 5120 ,         "tests/testdata/foo/huge_file", "/NTORRENT/foo/", false, false },
-      // assertion failures (tests not supported on platforms)
+    // assertion failures (tests not supported on platforms)
     // {0            , 128          , "tests/testdata/foo/bar.txt", "/NTORRENT/bar/", true },
     // {128          , 0            , "tests/testdata/foo/bar.txt", "/NTORRENT/bar/", true },
   };

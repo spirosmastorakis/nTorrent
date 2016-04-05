@@ -434,5 +434,195 @@ void TorrentManager::seed(const Data& data) const {
   // TODO(msweatt) IMPLEMENT ME
 }
 
+void
+TorrentManager::downloadTorrentFile(const std::string& path,
+                                    DataReceivedCallback onSuccess,
+                                    FailedCallback onFailed)
+{
+  auto manifestNames = make_shared<std::vector<Name>>();
+  this->downloadTorrentFileSegment(m_torrentFileName, path, manifestNames,
+                                   true, onSuccess, onFailed);
+}
+
+std::vector<Name>
+TorrentManager::downloadTorrentFile(const std::string& path)
+{
+  auto manifestNames = make_shared<std::vector<Name>>();
+  this->downloadTorrentFileSegment(m_torrentFileName, path, manifestNames,
+                                  false, {}, {});
+  return *manifestNames;
+}
+
+void
+TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
+                                           const std::string& path,
+                                           std::shared_ptr<std::vector<Name>> manifestNames,
+                                           bool async,
+                                           DataReceivedCallback onSuccess,
+                                           FailedCallback onFailed)
+{
+  shared_ptr<Interest> interest = createInterest(name);
+
+  auto dataReceived = [manifestNames, path, async, onSuccess, onFailed, this]
+                                            (const Interest& interest, const Data& data) {
+      // Stats Table update here...
+      m_stats_table_iter->incrementReceivedData();
+      m_retries = 0;
+
+      TorrentFile file(data.wireEncode());
+
+      // Write the torrent file segment to disk...
+      writeTorrentSegment(file, path);
+
+      const std::vector<Name>& manifestCatalog = file.getCatalog();
+      manifestNames->insert(manifestNames->end(), manifestCatalog.begin(), manifestCatalog.end());
+
+      shared_ptr<Name> nextSegmentPtr = file.getTorrentFilePtr();
+
+      if (async) {
+        onSuccess(file.getName());
+      }
+      if (nextSegmentPtr != nullptr) {
+        this->downloadTorrentFileSegment(*nextSegmentPtr, path, manifestNames,
+                                         async, onSuccess, onFailed);
+      }
+  };
+
+  auto dataFailed = [manifestNames, path, name, async, onSuccess, onFailed, this]
+                                                (const Interest& interest) {
+    ++m_retries;
+    if (m_retries >= MAX_NUM_OF_RETRIES) {
+      ++m_stats_table_iter;
+      if (m_stats_table_iter == m_statsTable.end()) {
+        m_stats_table_iter = m_statsTable.begin();
+      }
+    }
+    if (async) {
+      onFailed(interest.getName(), "Unknown error");
+    }
+    this->downloadTorrentFileSegment(name, path, manifestNames, async, onSuccess, onFailed);
+  };
+
+  m_face.expressInterest(*interest, dataReceived, dataFailed);
+
+  if (!async) {
+    m_face.processEvents();
+  }
+}
+
+
+void
+TorrentManager::download_file_manifest(const Name&              manifestName,
+                                       const std::string&       path,
+                                       TorrentManager::ManifestReceivedCallback onSuccess,
+                                       TorrentManager::FailedCallback           onFailed)
+{
+  auto packetNames = make_shared<std::vector<Name>>();
+  this->downloadFileManifestSegment(manifestName, path, packetNames, onSuccess, onFailed);
+}
+
+void
+TorrentManager::downloadFileManifestSegment(const Name& manifestName,
+                                            const std::string& path,
+                                            std::shared_ptr<std::vector<Name>> packetNames,
+                                            TorrentManager::ManifestReceivedCallback onSuccess,
+                                            TorrentManager::FailedCallback onFailed)
+{
+  shared_ptr<Interest> interest = this->createInterest(manifestName);
+
+  auto dataReceived = [packetNames, path, onSuccess, onFailed, this]
+                                          (const Interest& interest, const Data& data) {
+    // Stats Table update here...
+    m_stats_table_iter->incrementReceivedData();
+    m_retries = 0;
+
+    FileManifest file(data.wireEncode());
+
+    // Write the file manifest segment to disk...
+    writeFileManifest(file, path);
+
+    const std::vector<Name>& packetsCatalog = file.catalog();
+    packetNames->insert(packetNames->end(), packetsCatalog.begin(), packetsCatalog.end());
+    shared_ptr<Name> nextSegmentPtr = file.submanifest_ptr();
+    if (nextSegmentPtr != nullptr) {
+      this->downloadFileManifestSegment(*nextSegmentPtr, path, packetNames, onSuccess, onFailed);
+    }
+    else
+      onSuccess(*packetNames);
+  };
+
+  auto dataFailed = [packetNames, path, manifestName, onFailed, this]
+                                                (const Interest& interest) {
+    m_retries++;
+    if (m_retries >= MAX_NUM_OF_RETRIES) {
+      m_stats_table_iter++;
+      if (m_stats_table_iter == m_statsTable.end())
+        m_stats_table_iter = m_statsTable.begin();
+    }
+    onFailed(interest.getName(), "Unknown failure");
+  };
+
+  m_face.expressInterest(*interest, dataReceived, dataFailed);
+}
+
+void
+TorrentManager::download_data_packet(const Name& packetName,
+                                     DataReceivedCallback onSuccess,
+                                     FailedCallback onFailed)
+{
+  shared_ptr<Interest> interest = this->createInterest(packetName);
+
+  auto dataReceived = [onSuccess, onFailed, this]
+                                          (const Interest& interest, const Data& data) {
+    // Write data to disk...
+    writeData(data);
+
+    // Stats Table update here...
+    m_stats_table_iter->incrementReceivedData();
+    m_retries = 0;
+    onSuccess(data.getName());
+  };
+  auto dataFailed = [onFailed, this]
+                             (const Interest& interest) {
+    m_retries++;
+    if (m_retries >= MAX_NUM_OF_RETRIES) {
+      m_stats_table_iter++;
+      if (m_stats_table_iter == m_statsTable.end())
+        m_stats_table_iter = m_statsTable.begin();
+    }
+    onFailed(interest.getName(), "Unknown failure");
+  };
+
+  m_face.expressInterest(*interest, dataReceived, dataFailed);
+}
+
+shared_ptr<Interest>
+TorrentManager::createInterest(Name name)
+{
+  shared_ptr<Interest> interest = make_shared<Interest>(name);
+  interest->setInterestLifetime(time::milliseconds(2000));
+  interest->setMustBeFresh(true);
+
+  // Select routable prefix
+  Link link(name, { {1, m_stats_table_iter->getRecordName()} });
+  m_keyChain->sign(link, signingWithSha256());
+  Block linkWire = link.wireEncode();
+
+  // Stats Table update here...
+  m_stats_table_iter->incrementSentInterests();
+
+  m_sortingCounter++;
+  if (m_sortingCounter >= SORTING_INTERVAL) {
+    m_sortingCounter = 0;
+    m_statsTable.sort();
+    m_stats_table_iter = m_statsTable.begin();
+    m_retries = 0;
+  }
+
+  interest->setLink(linkWire);
+
+  return interest;
+}
+
 }  // end ntorrent
 }  // end ndn
