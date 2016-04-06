@@ -141,6 +141,14 @@ class FileManifest : public Data {
   data_packet_size() const;
   /// Returns the 'data_packet_size' of this FileManifest
 
+  size_t
+  submanifest_number() const;
+  /// Return the submanifest number for this FileManifest
+
+  std::string
+  file_name() const;
+  /// Return the file name for this FileManifest
+
   std::shared_ptr<Name>
   submanifest_ptr() const;
   /// Returns the 'submanifest_ptr' of this FileManifest, or 'nullptr' is none exists
@@ -299,6 +307,19 @@ inline std::shared_ptr<Name>
 FileManifest::submanifest_ptr() const
 {
   return m_submanifestPtr;
+}
+
+inline std::string
+FileManifest::file_name() const
+{
+  return name().getSubName(1, name().size() - 2).toUri();
+}
+
+
+inline size_t
+FileManifest::submanifest_number() const
+{
+  return name().get(name().size() - 1).toSequenceNumber();
 }
 
 inline void

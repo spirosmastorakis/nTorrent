@@ -28,7 +28,6 @@
 #include <ndn-cxx/data.hpp>
 
 #include <boost/filesystem/fstream.hpp>
-#include <boost/utility.hpp>
 
 #include <functional>
 #include <memory>
@@ -41,7 +40,7 @@ namespace fs = boost::filesystem;
 namespace ndn {
 namespace ntorrent {
 
-class TorrentManager : boost::noncopyable {
+class TorrentManager : noncopyable {
   /**
    * \class TorrentManager
    *
@@ -93,9 +92,34 @@ class TorrentManager : boost::noncopyable {
 
  protected:
   bool writeData(const Data& packet);
-  // Write the Data packet to disk, return 'true' if data successfully written to disk 'false'
-  // otherwise. Behavior is undefined unless the corresponding file manifest has already been
-  // downloaded.
+  /*
+   * \brief Write @p packet composed of torrent date to disk.
+   * @param packet The data packet to be written to the disk
+   * Write the Data packet to disk, return 'true' if data successfully written to disk 'false'
+   * otherwise. Behavior is undefined unless the corresponding file manifest has already been
+   * downloaded.
+  */
+
+  bool writeTorrentSegment(const TorrentFile& segment, const std::string& path);
+  /*
+   * \brief Write the @p segment torrent segment to disk at the specified path.
+   * @param segment The torrent file segment to be written to disk
+   * @param path The path at which to write the torrent file segment
+   * Write the segment to disk, return 'true' if data successfully written to disk 'false'
+   * otherwise. Behavior is undefined unless @segment is a correct segment for the torrent file of
+   * this manager and @p path is the directory used for all segments of this torrent file.
+   */
+
+  bool writeFileManifest(const FileManifest& manifest, const std::string& path);
+  /*
+   * \brief Write the @p manifest file manifest to disk at the specified @p path.
+   * @param manifest The file manifest  to be written to disk
+   * @param path The path at which to write the file manifest
+   * Write the file manifest to disk, return 'true' if data successfully written to disk 'false'
+   * otherwise. Behavior is undefined unless @manifest is a correct file manifest for a file in the
+   * torrent file of this manager and @p path is the directory used for all file manifests of this
+   * torrent file.
+   */
 
   void onDataReceived(const Data& data);
 

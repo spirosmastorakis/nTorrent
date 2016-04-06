@@ -65,6 +65,13 @@ class TestTorrentManager : public TorrentManager {
   bool writeData(const Data& data) {
     return TorrentManager::writeData(data);
   }
+
+  bool writeTorrentSegment(const TorrentFile& segment, const std::string& path) {
+    return TorrentManager::writeTorrentSegment(segment, path);
+  }
+  bool writeFileManifest(const FileManifest& manifest, const std::string& path) {
+    return TorrentManager::writeFileManifest(manifest, path);
+  }
 };
 
 BOOST_AUTO_TEST_SUITE(TestTorrentManagerInitialize)
@@ -98,13 +105,13 @@ BOOST_AUTO_TEST_CASE(CheckInitializeComplete)
     auto filename = torrentPath + to_string(fileNum);
     io::save(t, filename);
   }
-  fileNum = 0;
+  //fileNum = 0;
   auto manifestPath = dirPath + "manifests/";
   boost::filesystem::create_directory(manifestPath);
   for (const auto& m : manifests) {
-    fileNum++;
-    auto filename = manifestPath + to_string(fileNum);
-    io::save(m, filename);
+    fs::path filename = manifestPath + m.file_name() + "/" + to_string(m.submanifest_number());
+    boost::filesystem::create_directories(filename.parent_path());
+    io::save(m, filename.string());
   }
   // Initialize and verify
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253",
@@ -200,13 +207,12 @@ BOOST_AUTO_TEST_CASE(CheckInitializeMissingManifests)
     auto filename = torrentPath + to_string(fileNum);
     io::save(t, filename);
   }
-  fileNum = 0;
   auto manifestPath = dirPath + "manifests/";
   boost::filesystem::create_directory(manifestPath);
   for (const auto& m : manifests) {
-    fileNum++;
-    auto filename = manifestPath + to_string(fileNum);
-    io::save(m, filename);
+    fs::path filename = manifestPath + m.file_name() + to_string(m.submanifest_number());
+    boost::filesystem::create_directory(filename.parent_path());
+    io::save(m, filename.string());
   }
   // Initialize and verify
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253",
@@ -263,13 +269,13 @@ BOOST_AUTO_TEST_CASE(CheckWriteDataComplete)
     auto filename = torrentPath + to_string(fileNum);
     io::save(t, filename);
   }
-  fileNum = 0;
+  //fileNum = 0;
   auto manifestPath = dirPath + "manifests/";
   boost::filesystem::create_directory(manifestPath);
   for (const auto& m : manifests) {
-    fileNum++;
-    auto filename = manifestPath + to_string(fileNum);
-    io::save(m, filename);
+    fs::path filename = manifestPath + m.file_name() + to_string(m.submanifest_number());
+    boost::filesystem::create_directory(filename.parent_path());
+    io::save(m, filename.string());
   }
   // Initialize manager
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253",
@@ -320,6 +326,150 @@ BOOST_AUTO_TEST_CASE(CheckWriteDataComplete)
   }
   fs::remove_all(filePath);
   fs::remove_all(".appdata");
+}
+
+BOOST_AUTO_TEST_CASE(CheckWriteTorrentComplete)
+{
+  const struct {
+      const char    *d_directoryPath;
+      const char    *d_initialSegmentName;
+      size_t         d_namesPerSegment;
+      size_t         d_subManifestSize;
+      size_t         d_dataPacketSize;
+  } DATA [] = {
+    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
+    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=96d900d6788465f9a7b00191581b004c910d74b3762d141ec0e82173731bc9f4",    1,    1, 1024},
+  };
+  enum { NUM_DATA = sizeof DATA / sizeof *DATA };
+  for (int i = 0; i < NUM_DATA; ++i) {
+    auto directoryPath      = DATA[i].d_directoryPath;
+    Name initialSegmentName = DATA[i].d_initialSegmentName;
+    auto namesPerSegment    = DATA[i].d_namesPerSegment;
+    auto dataPacketSize     = DATA[i].d_dataPacketSize;
+    auto subManifestSize    = DATA[i].d_subManifestSize;
+
+    vector<TorrentFile>  torrentSegments;
+    std::string filePath = "tests/testdata/temp";
+    // get torrent files
+    {
+      auto temp = TorrentFile::generate(directoryPath,
+                                        namesPerSegment,
+                                        subManifestSize,
+                                        dataPacketSize,
+                                        false);
+      torrentSegments = temp.first;
+    }
+    // Initialize manager
+    TestTorrentManager manager(initialSegmentName,
+                               filePath);
+    manager.Initialize();
+    std::string dirPath = ".appdata/foo/";
+    std::string torrentPath = dirPath + "torrent_files/";
+    BOOST_CHECK(manager.torrentSegments().empty());
+    for (const auto& t : torrentSegments) {
+      BOOST_CHECK(manager.writeTorrentSegment(t, torrentPath));
+    }
+    BOOST_CHECK(manager.torrentSegments() == torrentSegments);
+    // check that initializing a new manager also gets all the torrent torrentSegments
+    TestTorrentManager manager2(initialSegmentName,
+                                filePath);
+    manager2.Initialize();
+    BOOST_CHECK(manager2.torrentSegments() == torrentSegments);
+
+    // start anew
+    fs::remove_all(torrentPath);
+    fs::create_directories(torrentPath);
+    manager.Initialize();
+    BOOST_CHECK(manager.torrentSegments().empty());
+
+    // check that there is no dependence on the order of torrent segments
+    // randomize the order of the torrent segments
+    auto torrentSegmentsRandom = torrentSegments;
+    std::random_shuffle(torrentSegmentsRandom.begin(), torrentSegmentsRandom.end());
+    for (const auto& t : torrentSegmentsRandom) {
+      BOOST_CHECK(manager.writeTorrentSegment(t, torrentPath));
+    }
+    BOOST_CHECK(manager.torrentSegments() == torrentSegments);
+    fs::remove_all(".appdata");
+  }
+}
+
+BOOST_AUTO_TEST_CASE(CheckWriteManifestComplete)
+{
+  std::string dirPath = ".appdata/foo/";
+  std::string torrentPath = dirPath + "torrent_files/";
+  std::string manifestPath = dirPath + "manifests/";
+
+  const struct {
+     const char    *d_directoryPath;
+     const char    *d_initialSegmentName;
+     size_t         d_namesPerSegment;
+     size_t         d_subManifestSize;
+     size_t         d_dataPacketSize;
+  } DATA [] = {
+   {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
+   {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253",     128,  128, 1024},
+  };
+  enum { NUM_DATA = sizeof DATA / sizeof *DATA };
+  for (int i = 0; i < NUM_DATA; ++i) {
+    auto directoryPath      = DATA[i].d_directoryPath;
+    Name initialSegmentName = DATA[i].d_initialSegmentName;
+    auto namesPerSegment    = DATA[i].d_namesPerSegment;
+    auto dataPacketSize     = DATA[i].d_dataPacketSize;
+    auto subManifestSize    = DATA[i].d_subManifestSize;
+
+    vector<FileManifest> manifests;
+    vector<TorrentFile>  torrentSegments;
+
+    std::string filePath = "tests/testdata/temp";
+    // get torrent files and manifests
+    {
+       auto temp = TorrentFile::generate(directoryPath,
+                                         namesPerSegment,
+                                         subManifestSize,
+                                         dataPacketSize,
+                                         false);
+      torrentSegments = temp.first;
+      auto temp1      = temp.second;
+      for (const auto& ms : temp1) {
+        manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
+      }
+    }
+    TestTorrentManager manager(initialSegmentName,
+                              filePath);
+    manager.Initialize();
+    for (const auto& t : torrentSegments) {
+      manager.writeTorrentSegment(t, torrentPath);
+    }
+
+    BOOST_CHECK(manager.fileManifests().empty());
+    for (const auto& m : manifests) {
+      BOOST_CHECK(manager.writeFileManifest(m, manifestPath));
+    }
+    BOOST_CHECK(manager.fileManifests() == manifests);
+
+    TestTorrentManager manager2(initialSegmentName,
+                                filePath);
+
+    manager2.Initialize();
+    BOOST_CHECK(manager2.fileManifests() == manifests);
+
+    // start anew
+    fs::remove_all(manifestPath);
+    fs::create_directories(manifestPath);
+    manager.Initialize();
+    BOOST_CHECK(manager.fileManifests().empty());
+
+    // check that there is no dependence on the order of torrent segments
+    // randomize the order of the torrent segments
+    auto fileManifestsRandom = manifests;
+    std::random_shuffle(fileManifestsRandom.begin(), fileManifestsRandom.end());
+    for (const auto& m : fileManifestsRandom) {
+      BOOST_CHECK(manager.writeFileManifest(m, manifestPath));
+    }
+    BOOST_CHECK(manager2.fileManifests() == manifests);
+    fs::remove_all(".appdata");
+  }
 }
 
 

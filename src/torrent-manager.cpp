@@ -28,13 +28,16 @@ static vector<T>
 load_directory(const string& dirPath,
                ndn::io::IoEncoding encoding = ndn::io::IoEncoding::BASE_64) {
   vector<T> structures;
-
+  std::set<string> fileNames;
   if (fs::exists(dirPath)) {
-    for(fs::directory_iterator it(dirPath);
-      it !=  fs::directory_iterator();
+    for(fs::recursive_directory_iterator it(dirPath);
+      it !=  fs::recursive_directory_iterator();
       ++it)
     {
-      auto data_ptr = ndn::io::load<T>(it->path().string(), encoding);
+      fileNames.insert(it->path().string());
+    }
+    for (const auto& f : fileNames) {
+      auto data_ptr = ndn::io::load<T>(f, encoding);
       if (nullptr != data_ptr) {
         structures.push_back(*data_ptr);
       }
@@ -130,6 +133,7 @@ intializeTorrentSegments(const string& torrentFilePath, const Name& initialSegme
   security::KeyChain key_chain;
   Name currSegmentFullName = initialSegmentName;
   vector<TorrentFile> torrentSegments = load_directory<TorrentFile>(torrentFilePath);
+
   // Starting with the initial segment name, verify the names, loading next name from torrentSegment
   for (auto it = torrentSegments.begin(); it != torrentSegments.end(); ++it) {
     TorrentFile& segment = *it;
@@ -218,7 +222,7 @@ intializeDataPackets(const string&      filePath,
                      const TorrentFile& torrentFile)
 {
   vector<Data> packets;
-  auto subManifestNum = manifest.name().get(manifest.name().size() - 1).toSequenceNumber();
+  auto subManifestNum = manifest.submanifest_number();
 
   packets =  packetize_file(filePath,
                              manifest.name(),
@@ -243,8 +247,7 @@ initializeFileState(const string& dataPath,
                     const FileManifest& manifest)
 {
   // construct the file name
-  const auto manifestName = manifest.name();
-  auto fileName = manifestName.getSubName(1, manifestName.size() - 2).toUri();
+  auto fileName = manifest.file_name();
   auto filePath = dataPath + fileName;
   vector<bool> fileBitMap(manifest.catalog().size());
   auto fbits = fs::fstream::out | fs::fstream::binary;
@@ -283,7 +286,7 @@ void TorrentManager::Initialize()
       currCatalog = currTorrentFile_it->getCatalog();
     }
     // construct the file name
-    auto fileName = m.name().getSubName(1, m.name().size() - 2).toUri();
+    auto fileName = m.file_name();
     fs::path filePath = m_dataPath + fileName;
     // If there are any valid packets, add corresponding state to manager
     if (!fs::exists(filePath)) {
@@ -333,7 +336,7 @@ bool TorrentManager::writeData(const Data& packet)
   if (nullptr == fileState.first) {
     fileState = initializeFileState(m_dataPath, *manifest_it);
   }
-  auto packetNum = packetName.get(packet.getName().size() - 1).toSequenceNumber();
+  auto packetNum = packetName.get(packetName.size() - 1).toSequenceNumber();
   // if we already have the packet, do not rewrite it.
   if (fileState.second[packetNum]) {
     return false;
@@ -352,6 +355,78 @@ bool TorrentManager::writeData(const Data& packet)
   }
   // update bitmap
   fileState.second[packetNum] = true;
+  return true;
+}
+
+bool TorrentManager::writeTorrentSegment(const TorrentFile& segment, const std::string& path)
+{
+  // validate that this torrent segment belongs to our torrent
+  auto torrentPrefix = m_torrentFileName.getSubName(0, m_torrentFileName.size() - 1);
+  if (!torrentPrefix.isPrefixOf(segment.getName())) {
+    return false;
+  }
+
+  auto segmentNum = segment.getSegmentNumber();
+  // check if we already have it
+  if (m_torrentSegments.end() != std::find(m_torrentSegments.begin(), m_torrentSegments.end(),
+                                           segment))
+  {
+    return false;
+  }
+  // write to disk at path
+  if (!fs::exists(path)) {
+    fs::create_directories(path);
+  }
+  auto filename = path + to_string(segmentNum);
+  // if there is already a file on disk for this torrent segment, determine if we should override
+  if (fs::exists(filename)) {
+    auto segmentOnDisk_ptr = io::load<TorrentFile>(filename);
+    if (nullptr != segmentOnDisk_ptr && *segmentOnDisk_ptr == segment) {
+      return false;
+    }
+  }
+  io::save(segment, filename);
+  // add to collection
+  auto it = std::find_if(m_torrentSegments.begin(), m_torrentSegments.end(),
+                         [segmentNum](const TorrentFile& t){
+                           return t.getSegmentNumber() > segmentNum;
+                        });
+  m_torrentSegments.insert(it, segment);
+  return true;
+}
+
+bool TorrentManager::writeFileManifest(const FileManifest& manifest, const std::string& path)
+{
+  auto subManifestNum = manifest.submanifest_number();
+  fs::path filename = path + manifest.file_name() + "/" + to_string(subManifestNum);
+  // check if we already have it
+  if (m_fileManifests.end() != std::find(m_fileManifests.begin(), m_fileManifests.end(),
+                                         manifest))
+  {
+    return false;
+  }
+
+  // write to disk at path
+  if (!fs::exists(filename.parent_path())) {
+    boost::filesystem::create_directories(filename.parent_path());
+  }
+  // if there is already a file on disk for this torrent segment, determine if we should override
+  if (fs::exists(filename)) {
+    auto submanifestOnDisk_ptr = io::load<FileManifest>(filename.string());
+    if (nullptr != submanifestOnDisk_ptr && *submanifestOnDisk_ptr == manifest) {
+      return false;
+    }
+  }
+  io::save(manifest, filename.string());
+  // add to collection
+  // add to collection
+  auto it = std::find_if(m_fileManifests.begin(), m_fileManifests.end(),
+                         [&manifest](const FileManifest& m){
+                           return m.file_name() >  manifest.file_name()
+                           ||    (m.file_name() == manifest.file_name()
+                              && (m.submanifest_number() > manifest.submanifest_number()));
+                        });
+  m_fileManifests.insert(it, manifest);
   return true;
 }
 

@@ -107,6 +107,18 @@ public:
   getCatalog() const;
 
   /**
+   * @brief Get the segment number for this torrent file
+   */
+  size_t
+  getSegmentNumber() const;
+
+  /**
+   * @brief Get the directory name for this torrent file
+   */
+  std::string
+  getTorrentFilePath() const;
+
+  /**
    * @brief Decode from wire format
    */
   void
@@ -270,6 +282,19 @@ inline const Name&
 TorrentFile::getCommonPrefix() const
 {
   return m_commonPrefix;
+}
+
+inline std::string
+TorrentFile::getTorrentFilePath() const
+{
+  return (0 == getSegmentNumber() ? getFullName().get(-3) : getFullName().get(-4)).toUri();
+}
+
+inline size_t
+TorrentFile::getSegmentNumber() const
+{
+  const auto& lastComponent = getName().get(getName().size() - 1);
+  return lastComponent.isSequenceNumber() ? lastComponent.toSequenceNumber() : 0;
 }
 
 
