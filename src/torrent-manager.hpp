@@ -54,6 +54,7 @@ class TorrentManager : noncopyable {
  public:
    typedef std::function<void(const ndn::Name&)>                     DataReceivedCallback;
    typedef std::function<void(const std::vector<ndn::Name>&)>        ManifestReceivedCallback;
+   typedef std::function<void(const std::vector<ndn::Name>&)>        TorrentFileReceivedCallback;
    typedef std::function<void(const ndn::Name&, const std::string&)> FailedCallback;
 
    /*
@@ -114,7 +115,7 @@ class TorrentManager : noncopyable {
    */
   void
   downloadTorrentFile(const std::string& path,
-                      DataReceivedCallback onSuccess,
+                      TorrentFileReceivedCallback onSuccess,
                       FailedCallback onFailed);
 
   /*
@@ -131,10 +132,11 @@ class TorrentManager : noncopyable {
    * This method provides non-blocking downloading of all the file manifest segments
    *
    */
-  void download_file_manifest(const Name&              manifestName,
-                              const std::string&       path,
-                              ManifestReceivedCallback onSuccess,
-                              FailedCallback           onFailed);
+  void
+  download_file_manifest(const Name&              manifestName,
+                         const std::string&       path,
+                         ManifestReceivedCallback onSuccess,
+                         FailedCallback           onFailed);
 
   /*
    * @brief Download a data packet
@@ -147,12 +149,14 @@ class TorrentManager : noncopyable {
    * This method writes the downloaded data packet to m_dataPath on disk
    *
    */
-  void download_data_packet(const Name&          packetName,
-                            DataReceivedCallback onSuccess,
-                            FailedCallback       onFailed);
+  void
+  download_data_packet(const Name&          packetName,
+                       DataReceivedCallback onSuccess,
+                       FailedCallback       onFailed);
 
   // Seed the specified 'data' to the network.
-  void seed(const Data& data) const;
+  void
+  seed(const Data& data) const;
 
  protected:
   /*
@@ -162,7 +166,8 @@ class TorrentManager : noncopyable {
    * otherwise. Behavior is undefined unless the corresponding file manifest has already been
    * downloaded.
    */
-  bool writeData(const Data& packet);
+  bool
+  writeData(const Data& packet);
 
   /*
    * \brief Write the @p segment torrent segment to disk at the specified path.
@@ -172,7 +177,8 @@ class TorrentManager : noncopyable {
    * otherwise. Behavior is undefined unless @segment is a correct segment for the torrent file of
    * this manager and @p path is the directory used for all segments of this torrent file.
    */
-  bool writeTorrentSegment(const TorrentFile& segment, const std::string& path);
+  bool
+  writeTorrentSegment(const TorrentFile& segment, const std::string& path);
 
   /*
    * \brief Write the @p manifest file manifest to disk at the specified @p path.
@@ -183,7 +189,8 @@ class TorrentManager : noncopyable {
    * torrent file of this manager and @p path is the directory used for all file manifests of this
    * torrent file.
    */
-  bool writeFileManifest(const FileManifest& manifest, const std::string& path);
+  bool
+  writeFileManifest(const FileManifest& manifest, const std::string& path);
 
   /*
    * \brief Download the segments of the torrent file
@@ -201,12 +208,13 @@ class TorrentManager : noncopyable {
    *                 specified when async is false
    *
    */
-  void downloadTorrentFileSegment(const ndn::Name& name,
-                                  const std::string& path,
-                                  std::shared_ptr<std::vector<Name>> manifestNames,
-                                  bool async,
-                                  DataReceivedCallback onSuccess,
-                                  FailedCallback onFailed);
+  void
+  downloadTorrentFileSegment(const ndn::Name& name,
+                             const std::string& path,
+                             std::shared_ptr<std::vector<Name>> manifestNames,
+                             bool async,
+                             TorrentFileReceivedCallback onSuccess,
+                             FailedCallback onFailed);
 
   /*
    * \brief Download the segments of a file manifest
@@ -218,11 +226,12 @@ class TorrentManager : noncopyable {
    * @param onFailed Callback to be called when we fail to download a file manifest segment
    *
    */
-  void downloadFileManifestSegment(const Name& manifestName,
-                                   const std::string& path,
-                                   std::shared_ptr<std::vector<Name>> packetNames,
-                                   TorrentManager::ManifestReceivedCallback onSuccess,
-                                   TorrentManager::FailedCallback onFailed);
+  void
+  downloadFileManifestSegment(const Name& manifestName,
+                              const std::string& path,
+                              std::shared_ptr<std::vector<Name>> packetNames,
+                              ManifestReceivedCallback onSuccess,
+                              FailedCallback onFailed);
 
   enum {
     // Number of times to retry if a routable prefix fails to retrieve data
@@ -244,6 +253,67 @@ class TorrentManager : noncopyable {
   Name                                                                m_torrentFileName;
   // The path to the location on disk of the Data packet for this manager
   std::string                                                         m_dataPath;
+
+protected:
+  /*
+   * \brief Find the torrent file segment that we should download
+   *        (either we have nothing or we have them all)
+   * @return A shared_ptr to the name of the segment to download or
+   *         nullptr if we have all the segments
+   *
+   */
+  shared_ptr<Name>
+  findTorrentFileSegmentToDownload();
+
+  /*
+   * \brief Given a file manifest segment name, find the next file manifest segment
+   *        that we should download
+   * @param manifestName The name of the file manifest segment that we want to download
+   * @return A shared_ptr to the name of the segment to download or
+   *         nullptr if we have all the segments
+   *
+   */
+  shared_ptr<Name>
+  findManifestSegmentToDownload(const Name& manifestName);
+
+  /*
+   * \brief Given a data packet name, find whether we have already downloaded this packet
+   * @param dataName The name of the data packet to download
+   * @return True if we have already downloaded this packet, false otherwise
+   *
+   */
+  bool
+  dataAlreadyDownloaded(const Name& dataName);
+
+  /*
+   * \brief Find the segments of all the file manifests that we are missing
+   * @param manifestNames The name of the manifest file segments to download (currently missing)
+   *                      This parameter is used as an output vector of names
+   */
+  void
+  findFileManifestsToDownload(std::vector<Name>& manifestNames);
+
+  /*
+   * \brief Find the names of the data packets of a file manifest that we are currently missing
+   * @param manifestName The name of the manifest
+   * @param packetNames The name of the data packets to be downloaded
+   *                    (used as an output vector of names)
+   *
+   * No matter what segment of a manifest file the manifestName parameter might refer to, the
+   * missing data packets starting from the first segment of this manifest file would be returned
+   *
+   */
+  void
+  findDataPacketsToDownload(const Name& manifestName, std::vector<Name>& packetNames);
+
+  /*
+   * \brief Find all the data packets that we are currently missing
+   * @param packetNames The name of the data packets to be downloaded
+   *                    (used as an output vector of names)
+   *
+   */
+  void
+  findAllMissingDataPackets(std::vector<Name>& packetNames);
 
 private:
   shared_ptr<Interest>

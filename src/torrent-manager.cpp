@@ -436,18 +436,44 @@ void TorrentManager::seed(const Data& data) const {
 
 void
 TorrentManager::downloadTorrentFile(const std::string& path,
-                                    DataReceivedCallback onSuccess,
+                                    TorrentFileReceivedCallback onSuccess,
                                     FailedCallback onFailed)
 {
+  shared_ptr<Name> searchRes = this->findTorrentFileSegmentToDownload();
   auto manifestNames = make_shared<std::vector<Name>>();
-  this->downloadTorrentFileSegment(m_torrentFileName, path, manifestNames,
+  if (searchRes == nullptr) {
+    this->findFileManifestsToDownload(*manifestNames);
+    if (manifestNames->empty()) {
+      auto packetNames = make_shared<std::vector<Name>>();
+      this->findAllMissingDataPackets(*packetNames);
+      onSuccess(*packetNames);
+      return;
+    }
+    else {
+      onSuccess(*manifestNames);
+      return;
+    }
+  }
+  this->downloadTorrentFileSegment(*searchRes, path, manifestNames,
                                    true, onSuccess, onFailed);
 }
 
 std::vector<Name>
 TorrentManager::downloadTorrentFile(const std::string& path)
 {
+  shared_ptr<Name> searchRes = this->findTorrentFileSegmentToDownload();
   auto manifestNames = make_shared<std::vector<Name>>();
+  if (searchRes == nullptr) {
+    this->findFileManifestsToDownload(*manifestNames);
+    if (manifestNames->empty()) {
+      auto packetNames = make_shared<std::vector<Name>>();
+      this->findAllMissingDataPackets(*packetNames);
+      return *packetNames;
+    }
+    else {
+      return *manifestNames;
+    }
+  }
   this->downloadTorrentFileSegment(m_torrentFileName, path, manifestNames,
                                   false, {}, {});
   return *manifestNames;
@@ -458,7 +484,7 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
                                            const std::string& path,
                                            std::shared_ptr<std::vector<Name>> manifestNames,
                                            bool async,
-                                           DataReceivedCallback onSuccess,
+                                           TorrentFileReceivedCallback onSuccess,
                                            FailedCallback onFailed)
 {
   shared_ptr<Interest> interest = createInterest(name);
@@ -468,6 +494,10 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
       // Stats Table update here...
       m_stats_table_iter->incrementReceivedData();
       m_retries = 0;
+
+      if (async) {
+        manifestNames->clear();
+      }
 
       TorrentFile file(data.wireEncode());
 
@@ -480,7 +510,7 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
       shared_ptr<Name> nextSegmentPtr = file.getTorrentFilePtr();
 
       if (async) {
-        onSuccess(file.getName());
+        onSuccess(*manifestNames);
       }
       if (nextSegmentPtr != nullptr) {
         this->downloadTorrentFileSegment(*nextSegmentPtr, path, manifestNames,
@@ -517,8 +547,14 @@ TorrentManager::download_file_manifest(const Name&              manifestName,
                                        TorrentManager::ManifestReceivedCallback onSuccess,
                                        TorrentManager::FailedCallback           onFailed)
 {
+  shared_ptr<Name> searchRes = findManifestSegmentToDownload(manifestName);
   auto packetNames = make_shared<std::vector<Name>>();
-  this->downloadFileManifestSegment(manifestName, path, packetNames, onSuccess, onFailed);
+  if (searchRes == nullptr) {
+    this->findDataPacketsToDownload(manifestName, *packetNames);
+    onSuccess(*packetNames);
+    return;
+  }
+  this->downloadFileManifestSegment(*searchRes, path, packetNames, onSuccess, onFailed);
 }
 
 void
@@ -570,6 +606,11 @@ TorrentManager::download_data_packet(const Name& packetName,
                                      DataReceivedCallback onSuccess,
                                      FailedCallback onFailed)
 {
+  if (this->dataAlreadyDownloaded(packetName)) {
+    onSuccess(packetName);
+    return;
+  }
+
   shared_ptr<Interest> interest = this->createInterest(packetName);
 
   auto dataReceived = [onSuccess, onFailed, this]
@@ -622,6 +663,122 @@ TorrentManager::createInterest(Name name)
   interest->setLink(linkWire);
 
   return interest;
+}
+
+shared_ptr<Name>
+TorrentManager::findTorrentFileSegmentToDownload()
+{
+  // if we have no segments
+  if (m_torrentSegments.empty()) {
+    return make_shared<Name>(m_torrentFileName);
+  }
+  // otherwise just return the next segment ptr of the last segment we have
+  return m_torrentSegments.back().getTorrentFilePtr();
+}
+
+shared_ptr<Name>
+TorrentManager::findManifestSegmentToDownload(const Name& manifestName)
+{
+  //sequentially find whether we have downloaded any segments of this manifest file
+  Name manifestPrefix = manifestName.getSubName(0, manifestName.size() - 2);
+  auto it = std::find_if(m_fileManifests.rbegin(), m_fileManifests.rend(),
+                      [&manifestPrefix] (const FileManifest& f) {
+                        return manifestPrefix.isPrefixOf(f.getName());
+                      });
+
+  // if we do not have any segments of the file manifest
+  if (it == m_fileManifests.rend()) {
+    return make_shared<Name>(manifestName);
+  }
+
+  // if we already have the requested segment of the file manifest
+  if (it->submanifest_number() >= manifestName.get(manifestName.size() - 2).toSequenceNumber()) {
+    return it->submanifest_ptr();
+  }
+  // if we do not have the requested segment
+  else {
+    return make_shared<Name>(manifestName);
+  }
+}
+
+bool
+TorrentManager::dataAlreadyDownloaded(const Name& dataName)
+{
+
+  auto manifest_it = std::find_if(m_fileManifests.begin(), m_fileManifests.end(),
+                                 [&dataName](const FileManifest& m) {
+                                   return m.getName().isPrefixOf(dataName);
+                                 });
+
+  // if we do not have the file manifest, just return false
+  if (manifest_it == m_fileManifests.end()) {
+    return false;
+  }
+
+  // find the pair of (std::shared_ptr<fs::fstream>, std::vector<bool>)
+  // that corresponds to the specific submanifest
+  auto& fileState = m_fileStates[manifest_it->getFullName()];
+
+  auto dataNum = dataName.get(dataName.size() - 2).toSequenceNumber();
+
+  // find whether we have the requested packet from the bitmap
+  return fileState.second[dataNum];
+}
+
+void
+TorrentManager::findFileManifestsToDownload(std::vector<Name>& manifestNames)
+{
+  std::vector<Name> manifests;
+  // insert the first segment name of all the file manifests to the vector
+  for (auto i = m_torrentSegments.begin(); i != m_torrentSegments.end(); i++) {
+    manifests.insert(manifests.end(), i->getCatalog().begin(), i->getCatalog().end());
+  }
+  // for each file
+  for (const auto& manifestName : manifests) {
+    // find the first (if any) segment we are missing
+    shared_ptr<Name> manifestSegmentName = findManifestSegmentToDownload(manifestName);
+    if (nullptr != manifestSegmentName) {
+      manifestNames.push_back(*manifestSegmentName);
+    }
+  }
+}
+
+void
+TorrentManager::findDataPacketsToDownload(const Name& manifestName, std::vector<Name>& packetNames)
+{
+  auto manifest_it = std::find_if(m_fileManifests.begin(), m_fileManifests.end(),
+                                 [&manifestName](const FileManifest& m) {
+                                   return m.name().getSubName(0, m.name().size()
+                                                              - 1).isPrefixOf(manifestName);
+                                 });
+
+  for (auto j = manifest_it; j != m_fileManifests.end(); j++) {
+    auto& fileState = m_fileStates[j->getFullName()];
+    for (size_t dataNum = 0; dataNum < j->catalog().size(); ++dataNum) {
+      if (!fileState.second[dataNum]) {
+        packetNames.push_back(j->catalog()[dataNum]);
+      }
+    }
+
+    // check that the next manifest in the vector refers to the next segment of the same file
+    if ((j + 1) != m_fileManifests.end() && (j+1)->file_name() != manifest_it->file_name()) {
+      break;
+    }
+  }
+}
+
+void
+TorrentManager::findAllMissingDataPackets(std::vector<Name>& packetNames)
+{
+  for (auto j = m_fileManifests.begin(); j != m_fileManifests.end(); j++) {
+    auto& fileState = m_fileStates[j->getFullName()];
+    for (auto i = j->catalog().begin(); i != j->catalog().end(); i++) {
+      auto dataNum = i->get(i->size() - 2).toSequenceNumber();
+      if (!fileState.second[dataNum]) {
+        packetNames.push_back(*i);
+      }
+    }
+  }
 }
 
 }  // end ntorrent
