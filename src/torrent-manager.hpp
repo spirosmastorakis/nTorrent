@@ -66,20 +66,9 @@ class TorrentManager : noncopyable {
     * The behavior is undefined unless Initialize() is called before calling any other method on a
     * TorrentManger object.
     */
-   TorrentManager(const ndn::Name&   torrentFileName,
-                  const std::string& dataPath,
-                  ndn::Face& face);
-
-   /*
-    * \brief Create a new Torrent manager with the specified parameters.
-    * @param torrentFileName The full name of the initial segment of the torrent file
-    * @param dataPath The path to the location on disk to use for the torrent data
-    *
-    * The behavior is undefined unless Initialize() is called before calling any other method on a
-    * TorrentManger object.
-    */
-   TorrentManager(const ndn::Name&   torrentFileName,
-                  const std::string& dataPath);
+   TorrentManager(const ndn::Name&      torrentFileName,
+                  const std::string&    dataPath,
+                  std::shared_ptr<Face> face = nullptr);
 
   /*
    * @brief Initialize the state of this object.
@@ -156,7 +145,7 @@ class TorrentManager : noncopyable {
 
   // Seed the specified 'data' to the network.
   void
-  seed(const Data& data) const;
+  seed(const Data& data);
 
  protected:
   /*
@@ -240,11 +229,21 @@ class TorrentManager : noncopyable {
     SORTING_INTERVAL = 100
   };
 
+  void onDataReceived(const Data& data);
+
+  void
+  onInterestReceived(const InterestFilter& filter, const Interest& interest);
+
+  void
+  onRegisterFailed(const Name& prefix, const std::string& reason);
+
   // A map from each fileManifest to corresponding file stream on disk and a bitmap of which Data
   // packets this manager currently has
   mutable std::unordered_map<Name,
                              std::pair<std::shared_ptr<fs::fstream>,
                                        std::vector<bool>>>            m_fileStates;
+  // A map for each initial manifest to the size for the sub-manifest
+  std::unordered_map<std::string, size_t>                             m_subManifestSizes;
   // The segments of the TorrentFile this manager has
   std::vector<TorrentFile>                                            m_torrentSegments;
   // The FileManifests this manager has
@@ -322,7 +321,7 @@ private:
   // Stats table where routable prefixes are stored
   StatsTable                                                          m_statsTable;
   // Face used for network communication
-  Face&                                                               m_face;
+  std::shared_ptr<Face>                                               m_face;
   // Iterator to the routable prefix that we currently use
   StatsTable::iterator                                                m_stats_table_iter;
   // Number of retries per routable prefix
@@ -336,7 +335,7 @@ private:
 inline
 TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
                                const std::string&    dataPath,
-                               ndn::Face& face)
+                               std::shared_ptr<Face> face)
 : m_fileStates()
 , m_torrentSegments()
 , m_fileManifests()
@@ -347,26 +346,9 @@ TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
 , m_sortingCounter(0)
 , m_keyChain(new KeyChain())
 {
-  // Hardcoded prefixes for now
-  // TODO(Spyros): Think of something more clever to bootstrap...
-  m_statsTable.insert("/ucla");
-  m_statsTable.insert("/arizona");
-  m_stats_table_iter = m_statsTable.begin();
-}
-
-inline
-TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
-                               const std::string&    dataPath)
-: m_fileStates()
-, m_torrentSegments()
-, m_fileManifests()
-, m_torrentFileName(torrentFileName)
-, m_dataPath(dataPath)
-, m_face(*(new ndn::Face()))
-, m_retries(0)
-, m_sortingCounter(0)
-, m_keyChain(new KeyChain())
-{
+  if(face == nullptr) {
+    face = make_shared<Face>();
+  }
   // Hardcoded prefixes for now
   // TODO(Spyros): Think of something more clever to bootstrap...
   m_statsTable.insert("/ucla");

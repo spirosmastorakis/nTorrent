@@ -239,6 +239,7 @@ TorrentFile::generate(const std::string& directoryPath,
                       size_t dataPacketSize,
                       bool returnData)
 {
+  //TODO(spyros) Adapt this support subdirectories in 'directoryPath'
   BOOST_ASSERT(0 < namesPerSegment);
 
   std::vector<TorrentFile> torrentSegments;
