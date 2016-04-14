@@ -22,8 +22,8 @@
 #define INCLUDED_TORRENT_FILE_MANAGER_H
 
 #include "file-manifest.hpp"
-#include "stats-table.hpp"
 #include "torrent-file.hpp"
+#include "update-handler.hpp"
 
 #include <ndn-cxx/data.hpp>
 #include <ndn-cxx/face.hpp>
@@ -329,7 +329,9 @@ private:
   // Number of Interests sent since last sorting
   uint64_t                                                            m_sortingCounter;
   // Keychain instance
-  unique_ptr<KeyChain>                                                m_keyChain;
+  shared_ptr<KeyChain>                                                m_keyChain;
+  // Update Handler instance
+  shared_ptr<UpdateHandler>                                           m_updateHandler;
 };
 
 inline
@@ -347,8 +349,9 @@ TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
 , m_keyChain(new KeyChain())
 {
   if(face == nullptr) {
-    face = make_shared<Face>();
+    m_face = make_shared<Face>();
   }
+
   // Hardcoded prefixes for now
   // TODO(Spyros): Think of something more clever to bootstrap...
   m_statsTable.insert("/ucla");

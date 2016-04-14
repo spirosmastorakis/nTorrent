@@ -29,7 +29,7 @@ namespace ntorrent {
 /**
  * @brief Represents a stats table
  */
-class StatsTable : boost::noncopyable {
+class StatsTable {
 public:
   /**
    * @brief Create an empty stats table

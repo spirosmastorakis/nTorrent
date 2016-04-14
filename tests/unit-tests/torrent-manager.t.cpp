@@ -21,6 +21,7 @@
 
 #include "boost-test.hpp"
 
+#include "dummy-parser-fixture.hpp"
 #include "torrent-manager.hpp"
 #include "torrent-file.hpp"
 #include "unit-test-time-fixture.hpp"
@@ -43,18 +44,14 @@ using ndn::util::DummyClientFace;
 namespace fs = boost::filesystem;
 
 class TestTorrentManager : public TorrentManager {
- public:
-  TestTorrentManager(const ndn::Name&   torrentFileName,
-                     const std::string& filePath)
-  : TorrentManager(torrentFileName, filePath)
-  {
-  }
-
+public:
   TestTorrentManager(const ndn::Name&                 torrentFileName,
                      const std::string&               filePath,
                      std::shared_ptr<DummyClientFace> face)
   : TorrentManager(torrentFileName, filePath, face)
+  , m_face(face)
   {
+    m_keyChain = make_shared<KeyChain>();
   }
 
   std::vector<TorrentFile> torrentSegments() const {
@@ -111,6 +108,18 @@ class TestTorrentManager : public TorrentManager {
   bool writeFileManifest(const FileManifest& manifest, const std::string& path) {
     return TorrentManager::writeFileManifest(manifest, path);
   }
+
+  void sendRoutablePrefixResponse() {
+    // Create a data packet containing one name as content
+    shared_ptr<Data> d = DummyParser::createDataPacket(Name("/localhop/nfd/rib/routable-prefixes"),
+                                                       { Name("ucla") });
+    m_keyChain->sign(*d);
+    m_face->receive(*d);
+  }
+
+private:
+  shared_ptr<KeyChain> m_keyChain;
+  shared_ptr<DummyClientFace> m_face;
 };
 
 class FaceFixture : public UnitTestTimeFixture
@@ -138,7 +147,6 @@ public:
     : FaceFixture(false)
   {
   }
-
 };
 
 BOOST_FIXTURE_TEST_SUITE(TestTorrentManagerInitialize, FaceFixture)
@@ -202,7 +210,11 @@ BOOST_AUTO_TEST_CASE(CheckInitializeComplete)
     TestTorrentManager manager(initialSegmentName,
                                filePath,
                                face);
+
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
 
     // Check that the torrent segments and file manifests match (content and order)
     BOOST_CHECK(manager.torrentSegments() == torrentSegments);
@@ -222,8 +234,13 @@ BOOST_AUTO_TEST_CASE(CheckInitializeComplete)
 BOOST_AUTO_TEST_CASE(CheckInitializeEmpty)
 {
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253",
-                             "tests/testdata/");
+                             "tests/testdata/", face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
+
   BOOST_CHECK(manager.torrentSegments() == vector<TorrentFile>());
   BOOST_CHECK(manager.fileManifests()   == vector<FileManifest>());
 }
@@ -276,7 +293,11 @@ BOOST_AUTO_TEST_CASE(CheckInitializeNoManifests)
     TestTorrentManager manager(initialSegmentName,
                                filePath,
                                face);
+
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
 
     // Check that the torrent segments and file manifests match (content and order)
     BOOST_CHECK(manager.torrentSegments() == torrentSegments);
@@ -342,11 +363,16 @@ BOOST_AUTO_TEST_CASE(CheckInitializeMissingManifests)
       boost::filesystem::create_directory(filename.parent_path());
       io::save(m, filename.string());
     }
+
     // Initialize and verify
     TestTorrentManager manager(initialSegmentName,
                                filePath,
                                face);
+
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
 
     // Check that the torrent segments and file manifests match (content and order)
     BOOST_CHECK(manager.torrentSegments() == torrentSegments);
@@ -388,7 +414,11 @@ BOOST_AUTO_TEST_CASE(TestDownloadingTorrentFile)
 
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=946b92641d2b87bf4f5913930be20e3789ff5fb5d72739614f93f677d90fbd9d",
                              filePath, face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   // Test download torrent file segments
   uint32_t counter = 0;
@@ -436,7 +466,11 @@ BOOST_AUTO_TEST_CASE(TestDownloadingFileManifests)
 
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=946b92641d2b87bf4f5913930be20e3789ff5fb5d72739614f93f677d90fbd9d",
                              filePath, face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   // Test download manifest segments -- 2 files (the first one segment, the second multiple)
   int counter = 0;
@@ -494,7 +528,11 @@ BOOST_AUTO_TEST_CASE(TestDownloadingDataPackets)
   std::string filePath = ".appdata/foo/";
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=946b92641d2b87bf4f5913930be20e3789ff5fb5d72739614f93f677d90fbd9d",
                              filePath, face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   Name dataName("/test/ucla");
 
@@ -537,7 +575,11 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload1)
   std::string filePath = ".appdata/foo/";
   TestTorrentManager manager("NTORRENT/test/torrent-file/sha256digest",
                              filePath, face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   TorrentFile t1(Name("NTORRENT/test/torrent-file/sha256digest"),
                  Name("NTORRENT/test/torrent-file/1/sha256digest"), Name("/test"),
@@ -576,11 +618,16 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload1)
 BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload2)
 {
   std::string filePath = ".appdata/foo/";
-  TestTorrentManager manager("/test/0/sha256digest",
+  TestTorrentManager manager("NTORRENT/test/torrent-file/0/sha256digest",
                              filePath, face);
+
   manager.Initialize();
 
-  BOOST_CHECK_EQUAL(manager.findTorrentFileSegmentToDownload()->toUri(), "/test/0/sha256digest");
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
+
+  BOOST_CHECK_EQUAL(manager.findTorrentFileSegmentToDownload()->toUri(),
+                    "/NTORRENT/test/torrent-file/0/sha256digest");
 
   fs::remove_all(filePath);
   fs::remove_all(".appdata");
@@ -631,7 +678,11 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload3)
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=a8a2e98cd943d895b8c4b12a208343bcf9344ce85a6376dc6f5754fe8f4a573e",
                              filePath,
                              face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   // Set the file state
   std::vector<bool> v1 = {true};
@@ -675,9 +726,13 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload3)
 BOOST_AUTO_TEST_CASE(TestFindManifestSegmentToDownload1)
 {
   std::string filePath = ".appdata/foo/";
-  TestTorrentManager manager("NTORRENT/test/sha256digest",
+  TestTorrentManager manager("NTORRENT/test/torrent-file/sha256digest",
                              filePath, face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   Name n1(Name("NTORRENT/test/file0"));
   n1.appendSequenceNumber(0);
@@ -786,7 +841,11 @@ BOOST_AUTO_TEST_CASE(TestFindManifestSegmentToDownload2)
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=a8a2e98cd943d895b8c4b12a208343bcf9344ce85a6376dc6f5754fe8f4a573e",
                              filePath,
                              face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   // Set the file state
   std::vector<bool> v1 = {true};
@@ -885,7 +944,11 @@ BOOST_AUTO_TEST_CASE(TestDataAlreadyDownloaded)
   TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=a8a2e98cd943d895b8c4b12a208343bcf9344ce85a6376dc6f5754fe8f4a573e",
                              filePath,
                              face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   // Set the file state
   std::vector<bool> v1 = {true};
@@ -973,7 +1036,12 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
     TestTorrentManager manager(initialSegmentName,
                                filePath,
                                face);
+
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
+
     size_t nData = 0;
     BOOST_CHECK_EQUAL(0, face->sentData.size());
     // request all the torrent segments
@@ -1093,7 +1161,11 @@ BOOST_AUTO_TEST_CASE(CheckSeedRandom)
   TestTorrentManager manager(initialSegmentName,
                              filePath,
                              face);
+
   manager.Initialize();
+
+  advanceClocks(time::milliseconds(1), 10);
+  manager.sendRoutablePrefixResponse();
 
   // insert the other entities
   data.insert(data.end(), torrentSegments.begin(), torrentSegments.end());
@@ -1189,7 +1261,12 @@ BOOST_AUTO_TEST_CASE(CheckWriteDataComplete)
     TestTorrentManager manager(initialSegmentName,
                                filePath,
                                face);
+
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
+
     // check that initially there is no data on disk
     for (auto m : manager.fileManifests()) {
       auto fileState = manager.fileState(m.getFullName());
@@ -1273,7 +1350,12 @@ BOOST_AUTO_TEST_CASE(CheckWriteTorrentComplete)
     TestTorrentManager manager(initialSegmentName,
                                filePath,
                                face);
+
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
+
     std::string dirPath = ".appdata/foo/";
     std::string torrentPath = dirPath + "torrent_files/";
     BOOST_CHECK(manager.torrentSegments().empty());
@@ -1285,13 +1367,22 @@ BOOST_AUTO_TEST_CASE(CheckWriteTorrentComplete)
     TestTorrentManager manager2(initialSegmentName,
                                 filePath,
                                 face);
+
     manager2.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager2.sendRoutablePrefixResponse();
+
     BOOST_CHECK(manager2.torrentSegments() == torrentSegments);
 
     // start anew
     fs::remove_all(torrentPath);
     fs::create_directories(torrentPath);
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
+
     BOOST_CHECK(manager.torrentSegments().empty());
 
     // check that there is no dependence on the order of torrent segments
@@ -1350,7 +1441,12 @@ BOOST_AUTO_TEST_CASE(CheckWriteManifestComplete)
     TestTorrentManager manager(initialSegmentName,
                               filePath,
                               face);
+
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
+
     for (const auto& t : torrentSegments) {
       manager.writeTorrentSegment(t, torrentPath);
     }
@@ -1366,12 +1462,20 @@ BOOST_AUTO_TEST_CASE(CheckWriteManifestComplete)
                                 face);
 
     manager2.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager2.sendRoutablePrefixResponse();
+
     BOOST_CHECK(manager2.fileManifests() == manifests);
 
     // start anew
     fs::remove_all(manifestPath);
     fs::create_directories(manifestPath);
     manager.Initialize();
+
+    advanceClocks(time::milliseconds(1), 10);
+    manager.sendRoutablePrefixResponse();
+
     BOOST_CHECK(manager.fileManifests().empty());
 
     // check that there is no dependence on the order of torrent segments

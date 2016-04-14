@@ -163,6 +163,20 @@ initializeFileState(const string&       dataPath,
 
 void TorrentManager::Initialize()
 {
+  // initialize the update handler
+
+  // figure out the name of the torrent
+  Name torrentName;
+  if (m_torrentFileName.get(m_torrentFileName.size() - 2).isSequenceNumber()) {
+    torrentName = m_torrentFileName.getSubName(1, m_torrentFileName.size() - 4);
+  }
+  else {
+    torrentName = m_torrentFileName.getSubName(1, m_torrentFileName.size() - 3);
+  }
+
+  m_updateHandler = make_shared<UpdateHandler>(torrentName, m_keyChain,
+                                               make_shared<StatsTable>(m_statsTable), m_face);
+
   // .../<torrent_name>/torrent-file/<implicit_digest>
   string dataPath = ".appdata/" + m_torrentFileName.get(-3).toUri();
   string manifestPath = dataPath +"/manifests";
@@ -231,6 +245,10 @@ void TorrentManager::Initialize()
 std::vector<Name>
 TorrentManager::downloadTorrentFile(const std::string& path)
 {
+  // check whether we should send out an "ALIVE" Interest
+  if (m_updateHandler->needsUpdate()) {
+    m_updateHandler->sendAliveInterest(m_stats_table_iter);
+  }
   shared_ptr<Name> searchRes = this->findTorrentFileSegmentToDownload();
   auto manifestNames = make_shared<std::vector<Name>>();
   if (searchRes == nullptr) {
@@ -743,6 +761,12 @@ TorrentManager::createInterest(Name name)
 
   m_sortingCounter++;
   if (m_sortingCounter >= SORTING_INTERVAL) {
+    // Use the sorting interval to send out "ALIVE" Interests as well
+    // check whether we should send out an "ALIVE" Interest
+    if (m_updateHandler->needsUpdate()) {
+      m_updateHandler->sendAliveInterest(m_stats_table_iter);
+    }
+    // Do the actual sorting related stuff
     m_sortingCounter = 0;
     m_statsTable.sort();
     m_stats_table_iter = m_statsTable.begin();
