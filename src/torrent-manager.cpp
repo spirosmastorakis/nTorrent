@@ -2,6 +2,7 @@
 
 #include "file-manifest.hpp"
 #include "torrent-file.hpp"
+#include "util/io-util.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -21,153 +22,16 @@ namespace fs = boost::filesystem;
 using std::string;
 using std::vector;
 
-namespace {
-// TODO(msweatt) Move this to a utility
-template<typename T>
-static vector<T>
-load_directory(const string& dirPath,
-               ndn::io::IoEncoding encoding = ndn::io::IoEncoding::BASE_64) {
-  vector<T> structures;
-  std::set<string> fileNames;
-  if (fs::exists(dirPath)) {
-    for(fs::recursive_directory_iterator it(dirPath);
-      it !=  fs::recursive_directory_iterator();
-      ++it)
-    {
-      fileNames.insert(it->path().string());
-    }
-    for (const auto& f : fileNames) {
-      auto data_ptr = ndn::io::load<T>(f, encoding);
-      if (nullptr != data_ptr) {
-        structures.push_back(*data_ptr);
-      }
-    }
-  }
-  structures.shrink_to_fit();
-  return structures;
-}
-
-} // end anonymous
-
 namespace ndn {
 namespace ntorrent {
-
-// TODO(msweatt) Move this to a utility
-static vector<ndn::Data>
-packetize_file(const fs::path& filePath,
-               const ndn::Name& commonPrefix,
-               size_t dataPacketSize,
-               size_t subManifestSize,
-               size_t subManifestNum)
-{
-  BOOST_ASSERT(0 < dataPacketSize);
-  size_t APPROX_BUFFER_SIZE = std::numeric_limits<int>::max(); // 2 * 1024 * 1024 *1024
-  auto file_size = fs::file_size(filePath);
-  auto start_offset = subManifestNum * subManifestSize * dataPacketSize;
-  // determine the number of bytes in this submanifest
-  auto subManifestLength = subManifestSize * dataPacketSize;
-  auto remainingFileLength = file_size - start_offset;
-  subManifestLength = remainingFileLength < subManifestLength
-                    ? remainingFileLength
-                    : subManifestLength;
-  vector<ndn::Data> packets;
-  packets.reserve(subManifestLength/dataPacketSize + 1);
-  fs::ifstream fs(filePath, fs::ifstream::binary);
-  if (!fs) {
-    BOOST_THROW_EXCEPTION(FileManifest::Error("IO Error when opening" + filePath.string()));
-  }
-  // ensure that buffer is large enough to contain whole packets
-  // buffer size is either the entire file or the smallest number of data packets >= 2 GB
-  auto buffer_size =
-    subManifestLength < APPROX_BUFFER_SIZE   ?
-    subManifestLength                        :
-    APPROX_BUFFER_SIZE % dataPacketSize == 0 ?
-    APPROX_BUFFER_SIZE :
-    APPROX_BUFFER_SIZE + dataPacketSize - (APPROX_BUFFER_SIZE % dataPacketSize);
-  vector<char> file_bytes;
-  file_bytes.reserve(buffer_size);
-  size_t bytes_read = 0;
-  fs.seekg(start_offset);
-  while(fs && bytes_read < subManifestLength && !fs.eof()) {
-    // read the file into the buffer
-    fs.read(&file_bytes.front(), buffer_size);
-    auto read_size = fs.gcount();
-    if (fs.bad() || read_size < 0) {
-      BOOST_THROW_EXCEPTION(FileManifest::Error("IO Error when reading" + filePath.string()));
-    }
-    bytes_read += read_size;
-    char *curr_start = &file_bytes.front();
-    for (size_t i = 0u; i < buffer_size; i += dataPacketSize) {
-      // Build a packet from the data
-      Name packetName = commonPrefix;
-      packetName.appendSequenceNumber(packets.size());
-      Data d(packetName);
-      auto content_length = i + dataPacketSize > buffer_size ? buffer_size - i : dataPacketSize;
-      d.setContent(encoding::makeBinaryBlock(tlv::Content, curr_start, content_length));
-      curr_start += content_length;
-      // append to the collection
-      packets.push_back(d);
-    }
-    file_bytes.clear();
-    // recompute the buffer_size
-    buffer_size =
-      subManifestLength - bytes_read < APPROX_BUFFER_SIZE ?
-      subManifestLength - bytes_read                      :
-      APPROX_BUFFER_SIZE % dataPacketSize == 0            ?
-      APPROX_BUFFER_SIZE                                  :
-      APPROX_BUFFER_SIZE + dataPacketSize - (APPROX_BUFFER_SIZE % dataPacketSize);
-  }
-  fs.close();
-  packets.shrink_to_fit();
-  ndn::security::KeyChain key_chain;
-  // sign all the packets
-  for (auto& p : packets) {
-    key_chain.sign(p, signingWithSha256());
-  }
-  return packets;
-}
-
-// =================================================================================================
-//                                      Torrent Manager Utility Functions
-// ==================================================================================================
-
-static std::shared_ptr<Data>
-readDataPacket(const Name& packetFullName,
-               const FileManifest& manifest,
-               size_t subManifestSize,
-               fs::fstream& is) {
-  auto dataPacketSize = manifest.data_packet_size();
-  auto start_offset = manifest.submanifest_number() * subManifestSize * dataPacketSize;
-  auto packetNum = packetFullName.get(packetFullName.size() - 2).toSequenceNumber();
-  // seek to packet
-  is.sync();
-  is.seekg(start_offset + packetNum * dataPacketSize);
-  if (is.tellg() < 0) {
-    std::cerr << "bad seek" << std::endl;
-  }
- // read contents
- std::vector<char> bytes(dataPacketSize);
- is.read(&bytes.front(), dataPacketSize);
- auto read_size = is.gcount();
- if (is.bad() || read_size < 0) {
-  std::cerr << "Bad read" << std::endl;
-  return nullptr;
- }
- // construct packet
- auto packetName = packetFullName.getSubName(0, packetFullName.size() - 1);
- auto d = make_shared<Data>(packetName);
- d->setContent(encoding::makeBinaryBlock(tlv::Content, &bytes.front(), read_size));
- ndn::security::KeyChain key_chain;
- key_chain.sign(*d, signingWithSha256());
- return d->getFullName() == packetFullName ? d : nullptr;
-}
 
 static vector<TorrentFile>
 intializeTorrentSegments(const string& torrentFilePath, const Name& initialSegmentName)
 {
   security::KeyChain key_chain;
   Name currSegmentFullName = initialSegmentName;
-  vector<TorrentFile> torrentSegments = load_directory<TorrentFile>(torrentFilePath);
+  vector<TorrentFile> torrentSegments = IoUtil::load_directory<TorrentFile>(torrentFilePath);
+
   // Starting with the initial segment name, verify the names, loading next name from torrentSegment
   for (auto it = torrentSegments.begin(); it != torrentSegments.end(); ++it) {
     TorrentFile& segment = *it;
@@ -191,10 +55,11 @@ intializeFileManifests(const string& manifestPath, const vector<TorrentFile>& to
 {
   security::KeyChain key_chain;
 
-  vector<FileManifest> manifests = load_directory<FileManifest>(manifestPath);
+  vector<FileManifest> manifests = IoUtil::load_directory<FileManifest>(manifestPath);
   if (manifests.empty()) {
     return manifests;
   }
+
   // sign the manifests
   std::for_each(manifests.begin(), manifests.end(),
                 [&key_chain](FileManifest& m){
@@ -249,11 +114,11 @@ initializeDataPackets(const string&      filePath,
   vector<Data> packets;
   auto subManifestNum = manifest.submanifest_number();
 
-  packets =  packetize_file(filePath,
-                            manifest.name(),
-                            manifest.data_packet_size(),
-                            subManifestSize,
-                            subManifestNum);
+  packets =  IoUtil::packetize_file(filePath,
+                                    manifest.name(),
+                                    manifest.data_packet_size(),
+                                    subManifestSize,
+                                    subManifestNum);
 
   auto catalog = manifest.catalog();
   // Filter out invalid packet names
@@ -410,7 +275,7 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
       // Write the torrent file segment to disk...
       if (writeTorrentSegment(file, path)) {
         // if successfully written, seed this data
-        seed(data);
+        seed(file);
       }
 
       const std::vector<Name>& manifestCatalog = file.getCatalog();
@@ -558,7 +423,6 @@ bool TorrentManager::writeData(const Data& packet)
     if (!fs::exists(filePath)) {
       fs::create_directories(filePath.parent_path());
     }
-
     fileState = initializeFileState(m_dataPath,
                                     *manifest_it,
                                     m_subManifestSizes[manifest_it->file_name()]);
@@ -568,98 +432,62 @@ bool TorrentManager::writeData(const Data& packet)
   if (fileState.second[packetNum]) {
     return false;
   }
-  auto dataPacketSize = manifest_it->data_packet_size();
-  auto initial_offset = manifest_it->submanifest_number() * m_subManifestSizes[manifest_it->file_name()] * dataPacketSize;
-  auto packetOffset =  initial_offset + packetNum * dataPacketSize;
   // write data to disk
-  fileState.first->seekp(packetOffset);
-  try {
-    auto content = packet.getContent();
-    std::vector<char> data(content.value_begin(), content.value_end());
-    fileState.first->write(&data[0], data.size());
+  // TODO(msweatt) Fix this once code is merged
+  auto subManifestSize = m_subManifestSizes[manifest_it->file_name()];
+  if (IoUtil::writeData(packet, *manifest_it, subManifestSize, *fileState.first)) {
+    // update bitmap
+    fileState.second[packetNum] = true;
+    return true;
   }
-  catch (io::Error &e) {
-    std::cerr << e.what() << std::endl;
-    return false;
-  }
-  // update bitmap
-  fileState.second[packetNum] = true;
-  return true;
+  return false;
 }
 
-bool TorrentManager::writeTorrentSegment(const TorrentFile& segment, const std::string& path)
+bool
+TorrentManager::writeTorrentSegment(const TorrentFile& segment, const std::string& path)
 {
-  // validate that this torrent segment belongs to our torrent
+  // validate  the torrent
   auto torrentPrefix = m_torrentFileName.getSubName(0, m_torrentFileName.size() - 1);
-  if (!torrentPrefix.isPrefixOf(segment.getName())) {
-    return false;
-  }
-
-  auto segmentNum = segment.getSegmentNumber();
   // check if we already have it
-  if (m_torrentSegments.end() != std::find(m_torrentSegments.begin(), m_torrentSegments.end(),
+  if (torrentPrefix.isPrefixOf(segment.getName()) &&
+      m_torrentSegments.end() == std::find(m_torrentSegments.begin(), m_torrentSegments.end(),
                                            segment))
   {
-    return false;
-  }
-  // write to disk at path
-  if (!fs::exists(path)) {
-    fs::create_directories(path);
-  }
-  auto filename = path + to_string(segmentNum);
-  // if there is already a file on disk for this torrent segment, determine if we should override
-  if (fs::exists(filename)) {
-    auto segmentOnDisk_ptr = io::load<TorrentFile>(filename);
-    if (nullptr != segmentOnDisk_ptr && *segmentOnDisk_ptr == segment) {
-      return false;
+    if(IoUtil::writeTorrentSegment(segment, path)) {
+      auto it = std::find_if(m_torrentSegments.begin(), m_torrentSegments.end(),
+                             [&segment](const TorrentFile& t){
+                               return segment.getSegmentNumber() < t.getSegmentNumber() ;
+                            });
+      m_torrentSegments.insert(it, segment);
+      return true;
     }
   }
-  io::save(segment, filename);
-  // add to collection
-  auto it = std::find_if(m_torrentSegments.begin(), m_torrentSegments.end(),
-                         [segmentNum](const TorrentFile& t){
-                           return t.getSegmentNumber() > segmentNum;
-                        });
-  m_torrentSegments.insert(it, segment);
-  return true;
+  return false;
 }
+
 
 bool TorrentManager::writeFileManifest(const FileManifest& manifest, const std::string& path)
 {
-  auto subManifestNum = manifest.submanifest_number();
-  fs::path filename = path + manifest.file_name() + "/" + to_string(subManifestNum);
-  // check if we already have it
-  if (m_fileManifests.end() != std::find(m_fileManifests.begin(), m_fileManifests.end(),
-                                         manifest))
+  if (m_fileManifests.end() == std::find(m_fileManifests.begin(), m_fileManifests.end(),
+                                           manifest))
   {
-    return false;
-  }
-
-  // write to disk at path
-  if (!fs::exists(filename.parent_path())) {
-    boost::filesystem::create_directories(filename.parent_path());
-  }
-  // if there is already a file on disk for this torrent segment, determine if we should override
-  if (fs::exists(filename)) {
-    auto submanifestOnDisk_ptr = io::load<FileManifest>(filename.string());
-    if (nullptr != submanifestOnDisk_ptr && *submanifestOnDisk_ptr == manifest) {
-      return false;
+    // update the state of the manager
+    if (0 == manifest.submanifest_number()) {
+      m_subManifestSizes[manifest.file_name()] = manifest.catalog().size();
+    }
+    if(IoUtil::writeFileManifest(manifest, path)) {
+      // add to collection
+      auto it = std::find_if(m_fileManifests.begin(), m_fileManifests.end(),
+                             [&manifest](const FileManifest& m){
+                               return m.file_name() >  manifest.file_name()
+                               ||    (m.file_name() == manifest.file_name()
+                                  && (m.submanifest_number() > manifest.submanifest_number()));
+                            });
+      m_fileManifests.insert(it, manifest);
+      return true;
     }
   }
-  io::save(manifest, filename.string());
-  // add to collection
-  auto it = std::find_if(m_fileManifests.begin(), m_fileManifests.end(),
-                         [&manifest](const FileManifest& m){
-                           return m.file_name() >  manifest.file_name()
-                           ||    (m.file_name() == manifest.file_name()
-                              && (m.submanifest_number() > manifest.submanifest_number()));
-                        });
-  // update the state of the manager
-  m_fileManifests.insert(it, manifest);
-  if (0 == manifest.submanifest_number()) {
-    m_subManifestSizes[manifest.file_name()] = manifest.catalog().size();
-  }
-  return true;
+  return false;
 }
 
 void
@@ -680,8 +508,11 @@ TorrentManager::downloadFileManifestSegment(const Name& manifestName,
     FileManifest file(data.wireEncode());
 
     // Write the file manifest segment to disk...
-    if( writeFileManifest(file, path)) {
+    if(writeFileManifest(file, path)) {
       seed(file);
+    }
+    else {
+      onFailed(interest.getName(), "Write Failed");
     }
 
     const std::vector<Name>& packetsCatalog = file.catalog();
@@ -690,8 +521,9 @@ TorrentManager::downloadFileManifestSegment(const Name& manifestName,
     if (nextSegmentPtr != nullptr) {
       this->downloadFileManifestSegment(*nextSegmentPtr, path, packetNames, onSuccess, onFailed);
     }
-    else
+    else {
       onSuccess(*packetNames);
+    }
   };
 
   auto dataFailed = [packetNames, path, manifestName, onFailed, this]
@@ -752,10 +584,10 @@ TorrentManager::onInterestReceived(const InterestFilter& filter, const Interest&
           auto filePath = m_dataPath + manifestFileName;
           // TODO(msweatt) Explore why fileState stream does not work
           fs::fstream is (filePath, fs::fstream::in | fs::fstream::binary);
-          data = readDataPacket(interestName,
-                                *manifest_it,
-                                m_subManifestSizes[manifestFileName],
-                                is);
+          data = IoUtil::readDataPacket(interestName,
+                                        *manifest_it,
+                                        m_subManifestSizes[manifestFileName],
+                                        is);
         }
       }
     }

@@ -20,6 +20,8 @@
 */
 #include "file-manifest.hpp"
 
+#include "util/io-util.hpp"
+
 #include <limits>
 
 #include <boost/assert.hpp>
@@ -71,80 +73,6 @@ get_name_of_manifest(const std::string& filePath, const Name& manifestPrefix)
   return manifestName;
 }
 
-static std::vector<Data>
-packetize_file(const fs::path&  filePath,
-               const ndn::Name& commonPrefix,
-               size_t dataPacketSize,
-               size_t subManifestSize,
-               size_t subManifestNum)
-{
-  BOOST_ASSERT(0 < dataPacketSize);
-  size_t APPROX_BUFFER_SIZE = std::numeric_limits<int>::max(); // 2 * 1024 * 1024 *1024
-  auto file_size = fs::file_size(filePath);
-  auto start_offset = subManifestNum * subManifestSize * dataPacketSize;
-  // determine the number of bytes in this submanifest
-  auto subManifestLength = subManifestSize * dataPacketSize;
-  auto remainingFileLength = file_size - start_offset;
-  subManifestLength = remainingFileLength < subManifestLength
-                    ? remainingFileLength
-                    : subManifestLength;
-  std::vector<Data> packets;
-  packets.reserve(subManifestLength/dataPacketSize + 1);
-  fs::ifstream fs(filePath, fs::ifstream::binary);
-  if (!fs) {
-    BOOST_THROW_EXCEPTION(FileManifest::Error("IO Error when opening" + filePath.string()));
-  }
-  // ensure that buffer is large enough to contain whole packets
-  // buffer size is either the entire file or the smallest number of data packets >= 2 GB
-  auto buffer_size =
-    subManifestLength < APPROX_BUFFER_SIZE   ?
-    subManifestLength                        :
-    APPROX_BUFFER_SIZE % dataPacketSize == 0 ?
-    APPROX_BUFFER_SIZE :
-    APPROX_BUFFER_SIZE + dataPacketSize - (APPROX_BUFFER_SIZE % dataPacketSize);
-  std::vector<char> file_bytes;
-  file_bytes.reserve(buffer_size);
-  size_t bytes_read = 0;
-  fs.seekg(start_offset);
-  while(fs && bytes_read < subManifestLength && !fs.eof()) {
-    // read the file into the buffer
-    fs.read(&file_bytes.front(), buffer_size);
-    auto read_size = fs.gcount();
-    if (fs.bad() || read_size < 0) {
-      BOOST_THROW_EXCEPTION(FileManifest::Error("IO Error when reading" + filePath.string()));
-    }
-    bytes_read += read_size;
-    char *curr_start = &file_bytes.front();
-    for (size_t i = 0u; i < buffer_size; i += dataPacketSize) {
-      // Build a packet from the data
-      Name packetName = commonPrefix;
-      packetName.appendSequenceNumber(packets.size());
-      Data d(packetName);
-      auto content_length = i + dataPacketSize > buffer_size ? buffer_size - i : dataPacketSize;
-      d.setContent(encoding::makeBinaryBlock(tlv::Content, curr_start, content_length));
-      curr_start += content_length;
-      // append to the collection
-      packets.push_back(d);
-    }
-    file_bytes.clear();
-    // recompute the buffer_size
-    buffer_size =
-      subManifestLength - bytes_read < APPROX_BUFFER_SIZE ?
-      subManifestLength - bytes_read                      :
-      APPROX_BUFFER_SIZE % dataPacketSize == 0            ?
-      APPROX_BUFFER_SIZE                                  :
-      APPROX_BUFFER_SIZE + dataPacketSize - (APPROX_BUFFER_SIZE % dataPacketSize);
-  }
-  fs.close();
-  packets.shrink_to_fit();
-  security::KeyChain key_chain;
-  // sign all the packets
-  for (auto& p : packets) {
-    key_chain.sign(p, signingWithSha256());
-  }
-  return packets;
-}
-
 // CLASS METHODS
 std::pair<std::vector<FileManifest>, std::vector<Data>>
 FileManifest::generate(const std::string& filePath,
@@ -176,11 +104,11 @@ FileManifest::generate(const std::string& filePath,
     // append the packet number
     curr_manifest_name.appendSequenceNumber(manifests.size());
     FileManifest curr_manifest(curr_manifest_name, dataPacketSize, manifestPrefix);
-    auto packets = packetize_file(path,
-                                  curr_manifest_name,
-                                  dataPacketSize,
-                                  subManifestSize,
-                                  subManifestNum);
+    auto packets = IoUtil::packetize_file(path,
+                                          curr_manifest_name,
+                                          dataPacketSize,
+                                          subManifestSize,
+                                          subManifestNum);
     if (returnData) {
       allPackets.insert(allPackets.end(), packets.begin(), packets.end());
     }
