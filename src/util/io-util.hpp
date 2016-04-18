@@ -48,8 +48,8 @@ class IoUtil {
    */
   enum NAME_TYPE
   {
-    FILE_MANIFEST,
     TORRENT_FILE,
+    FILE_MANIFEST,
     DATA_PACKET,
     UNKNOWN
   };

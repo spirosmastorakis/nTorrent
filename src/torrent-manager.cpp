@@ -77,7 +77,6 @@ intializeFileManifests(const string& manifestPath, const vector<TorrentFile>& to
   auto manifest_it =  manifests.begin();
   std::vector<FileManifest> output;
   output.reserve(manifests.size());
-  auto validIvalidInitialManifestNames_it = validInitialManifestNames.begin();
 
   for (auto& initialName : validInitialManifestNames) {
     // starting from the initial segment
