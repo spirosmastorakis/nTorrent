@@ -59,6 +59,12 @@ def build (bld):
         includes='src',
         export_includes='src',
     )
+    # main
+    bld(
+      target='ntorrent',
+      features='cxx cxxprogram',
+      source='src/main.cpp',
+      use = 'BOOST nTorrent')
 
     if bld.env["WITH_TESTS"]:
         feature_list += ' cxxstlib'
