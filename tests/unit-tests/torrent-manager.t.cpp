@@ -13,7 +13,7 @@
 * PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
 *
 * You should have received copies of the GNU General Public License and GNU Lesser
-* General Public License along with nTorrent, e.g., in COPYING.md file. If not, see
+* General Public License along with nTorrent, e.g., in COPYING.md file. SoIf not, see
 * <http://www.gnu.org/licenses/>.
 *
 * See AUTHORS for complete list of nTorrent authors and contributors.
@@ -1061,7 +1061,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
                             }));
       advanceClocks(time::milliseconds(1), 40);
       face->receive(interest);
-      face->processEvents(time::milliseconds(-1));
+      manager.processEvents();
       // check that one piece of data is sent, and it is what was expected
       BOOST_CHECK_EQUAL(++nData, face->sentData.size());
       face->receive(face->sentData[nData - 1]);
@@ -1083,7 +1083,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
                              }));
       advanceClocks(time::milliseconds(1), 40);
       face->receive(interest);
-      face->processEvents(time::milliseconds(-1));
+      manager.processEvents();
       // check that one piece of data is sent, and it is what was expected
       BOOST_CHECK_EQUAL(++nData, face->sentData.size());
       face->receive(face->sentData[nData - 1]);
@@ -1091,7 +1091,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
     // request all the data packets
     for (const auto& file : fileData) {
       for (const auto& data : file) {
-      Interest interest(data. getFullName(), time::milliseconds(50));
+      Interest interest(data.getFullName(), time::milliseconds(50));
       face->expressInterest(interest,
                             [&data](const Interest& i, const Data& d) {
                               BOOST_CHECK(data == d);
@@ -1104,7 +1104,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
                              }));
         advanceClocks(time::milliseconds(1), 40);
         face->receive(interest);
-        face->processEvents(time::milliseconds(-1));
+        manager.processEvents();
         // check that one piece of data is sent, and it is what was expected
         BOOST_CHECK_EQUAL(++nData, face->sentData.size());
         face->receive(face->sentData[nData - 1]);
@@ -1188,7 +1188,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedRandom)
                           }));
     advanceClocks(time::milliseconds(1), 40);
     face->receive(interest);
-    face->processEvents(time::milliseconds(-1));
+    manager.processEvents();
     // check that one piece of data is sent, and it is what was expected
     BOOST_CHECK_EQUAL(++nData, face->sentData.size());
     face->receive(face->sentData[nData - 1]);

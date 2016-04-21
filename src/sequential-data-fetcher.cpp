@@ -80,6 +80,7 @@ SequentialDataFetcher::downloadManifestFiles(const std::vector<ndn::Name>& manif
                               ".appdata/manifests/",
                               bind(&SequentialDataFetcher::onManifestReceived, this, _1),
                               bind(&SequentialDataFetcher::onDataRetrievalFailure, this, _1, _2));
+    m_manager->processEvents();
   }
 }
 
@@ -90,6 +91,7 @@ SequentialDataFetcher::downloadPackets(const std::vector<ndn::Name>& packetsName
     m_manager->download_data_packet(*i,
                               bind(&SequentialDataFetcher::onDataPacketReceived, this, _1),
                               bind(&SequentialDataFetcher::onDataRetrievalFailure, this, _1, _2));
+    m_manager->processEvents();
   }
 }
 
@@ -133,7 +135,7 @@ SequentialDataFetcher::onDataRetrievalFailure(const ndn::Interest& interest,
                                               const std::string& errorCode)
 {
   std::cerr << "Data Retrieval Failed: " << interest.getName() << std::endl;
-  
+
   // Data retrieval failure
   uint32_t nameType = IoUtil::findType(interest.getName());
   if (nameType == IoUtil::TORRENT_FILE) {

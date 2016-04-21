@@ -147,8 +147,15 @@ class TorrentManager : noncopyable {
   void
   seed(const Data& data);
 
+  /**
+   * @brief Process any data to receive or call timeout callbacks and update prefix list (if needed)
+   * By default only process pending events and return immediately, optionally specify a timeout.
+   */
+  void
+  processEvents(const time::milliseconds& timeout = time::milliseconds(-1));
+
  protected:
-  /*
+  /**
    * \brief Write @p packet composed of torrent date to disk.
    * @param packet The data packet to be written to the disk
    * Write the Data packet to disk, return 'true' if data successfully written to disk 'false'
@@ -357,6 +364,13 @@ TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
   m_statsTable.insert("/ucla");
   m_statsTable.insert("/arizona");
   m_stats_table_iter = m_statsTable.begin();
+}
+
+inline
+void
+TorrentManager::processEvents(const time::milliseconds& timeout)
+{
+  m_face->processEvents(timeout);
 }
 
 }  // end ntorrent

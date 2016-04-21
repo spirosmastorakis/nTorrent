@@ -22,8 +22,9 @@
 #ifndef FETCHING_STRATEGY_MANAGER_HPP
 #define FETCHING_STRATEGY_MANAGER_HPP
 
-#include <ndn-cxx/interest.hpp>
 #include <ndn-cxx/data.hpp>
+#include <ndn-cxx/interest.hpp>
+#include <ndn-cxx/util/time.hpp>
 
 namespace ndn {
 namespace ntorrent {
@@ -66,6 +67,12 @@ class FetchingStrategyManager {
     struct status {
       double downloadedPercent;
     };
+    /**
+     * @brief Seed downloaded data for the specified timeout.
+     * By default this will go into an infinite loop.
+     */
+    virtual void
+    seed(const time::milliseconds& timeout = time::milliseconds::zero()) const = 0;
 
   private:
     /**

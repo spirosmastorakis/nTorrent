@@ -70,6 +70,9 @@ class SequentialDataFetcher : FetchingStrategyManager {
     void
     resume();
 
+    void
+    seed(const time::milliseconds& timeout = time::milliseconds::zero()) const;
+
   protected:
     std::vector<ndn::Name>
     downloadTorrentFile();
@@ -97,6 +100,13 @@ class SequentialDataFetcher : FetchingStrategyManager {
     ndn::Name m_torrentFileName;
     shared_ptr<TorrentManager> m_manager;
 };
+
+inline
+void
+SequentialDataFetcher::seed(const time::milliseconds& timeout) const
+{
+  m_manager->processEvents(timeout);
+}
 
 } // namespace ntorrent
 } // namespace ndn
