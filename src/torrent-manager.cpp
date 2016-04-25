@@ -174,8 +174,8 @@ void TorrentManager::Initialize()
     torrentName = m_torrentFileName.getSubName(1, m_torrentFileName.size() - 3);
   }
 
-  m_updateHandler = make_shared<UpdateHandler>(torrentName, m_keyChain,
-                                               make_shared<StatsTable>(m_statsTable), m_face);
+  // m_updateHandler = make_shared<UpdateHandler>(torrentName, m_keyChain,
+  //                                              make_shared<StatsTable>(m_statsTable), m_face);
 
   // .../<torrent_name>/torrent-file/<implicit_digest>
   string dataPath = ".appdata/" + m_torrentFileName.get(-3).toUri();
@@ -246,9 +246,9 @@ std::vector<Name>
 TorrentManager::downloadTorrentFile(const std::string& path)
 {
   // check whether we should send out an "ALIVE" Interest
-  if (m_updateHandler->needsUpdate()) {
-    m_updateHandler->sendAliveInterest(m_stats_table_iter);
-  }
+  // if (m_updateHandler->needsUpdate()) {
+  //   m_updateHandler->sendAliveInterest(m_stats_table_iter);
+  // }
   shared_ptr<Name> searchRes = this->findTorrentFileSegmentToDownload();
   auto manifestNames = make_shared<std::vector<Name>>();
   if (searchRes == nullptr) {
@@ -564,7 +564,6 @@ TorrentManager::onInterestReceived(const InterestFilter& filter, const Interest&
   const auto& interestName = interest.getName();
   std::shared_ptr<Data> data = nullptr;
   auto cmp = [&interestName](const Data& t){return t.getFullName() == interestName;};
-
   // determine if it is torrent file (that we have)
   auto torrent_it =  std::find_if(m_torrentSegments.begin(), m_torrentSegments.end(), cmp);
   if (m_torrentSegments.end() != torrent_it) {
@@ -698,12 +697,14 @@ TorrentManager::dataAlreadyDownloaded(const Name& dataName)
 
   // find the pair of (std::shared_ptr<fs::fstream>, std::vector<bool>)
   // that corresponds to the specific submanifest
-  auto& fileState = m_fileStates[manifest_it->getFullName()];
-
-  auto dataNum = dataName.get(dataName.size() - 2).toSequenceNumber();
-
-  // find whether we have the requested packet from the bitmap
-  return fileState.second[dataNum];
+  auto fileState_it = m_fileStates.find(manifest_it->getFullName());
+  if (m_fileStates.end() != fileState_it) {
+    const auto& fileState = fileState_it->second;
+    auto dataNum = dataName.get(dataName.size() - 2).toSequenceNumber();
+    // find whether we have the requested packet from the bitmap
+    return fileState.second[dataNum];
+  }
+  return false;
 }
 
 void
@@ -733,12 +734,21 @@ TorrentManager::findDataPacketsToDownload(const Name& manifestName, std::vector<
 void
 TorrentManager::findAllMissingDataPackets(std::vector<Name>& packetNames)
 {
-  for (auto j = m_fileManifests.begin(); j != m_fileManifests.end(); j++) {
-    auto& fileState = m_fileStates[j->getFullName()];
-    for (auto i = j->catalog().begin(); i != j->catalog().end(); i++) {
-      auto dataNum = i->get(i->size() - 2).toSequenceNumber();
-      if (!fileState.second[dataNum]) {
-        packetNames.push_back(*i);
+  for (auto j = m_fileManifests.begin(); j != m_fileManifests.end(); ++j) {
+    auto fileState_it = m_fileStates.find(j->getFullName());
+    // if we have no packets from this file
+    if (m_fileStates.end() == fileState_it) {
+      packetNames.reserve(packetNames.size() + j->catalog().size());
+      packetNames.insert(packetNames.end(), j->catalog().begin(), j->catalog().end());
+    }
+    // find the packets that we are missing
+    else {
+      const auto &fileState =  fileState_it->second;
+      for (auto i = j->catalog().begin(); i != j->catalog().end(); i++) {
+        auto dataNum = i->get(i->size() - 2).toSequenceNumber();
+        if (!fileState.second[dataNum]) {
+          packetNames.push_back(*i);
+        }
       }
     }
   }
@@ -763,9 +773,9 @@ TorrentManager::createInterest(Name name)
   if (m_sortingCounter >= SORTING_INTERVAL) {
     // Use the sorting interval to send out "ALIVE" Interests as well
     // check whether we should send out an "ALIVE" Interest
-    if (m_updateHandler->needsUpdate()) {
-      m_updateHandler->sendAliveInterest(m_stats_table_iter);
-    }
+    // if (m_updateHandler->needsUpdate()) {
+    //   m_updateHandler->sendAliveInterest(m_stats_table_iter);
+    // }
     // Do the actual sorting related stuff
     m_sortingCounter = 0;
     m_statsTable.sort();

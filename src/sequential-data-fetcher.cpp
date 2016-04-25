@@ -66,8 +66,10 @@ SequentialDataFetcher::downloadTorrentFile()
 {
   std::vector<ndn::Name> returnedNames;
   returnedNames = m_manager->downloadTorrentFile(".appdata/torrent_files/");
-  std::cout << "Torrent File Received: "
-            << m_torrentFileName.getSubName(0, m_torrentFileName.size() - 1) << std::endl;
+  if (!returnedNames.empty() && IoUtil::NAME_TYPE::FILE_MANIFEST == IoUtil::findType(returnedNames[0])) {
+    std::cout << "Torrent File Received: "
+              << m_torrentFileName.getSubName(0, m_torrentFileName.size() - 1) << std::endl;
+  }
   return returnedNames;
 }
 
@@ -91,8 +93,8 @@ SequentialDataFetcher::downloadPackets(const std::vector<ndn::Name>& packetsName
     m_manager->download_data_packet(*i,
                               bind(&SequentialDataFetcher::onDataPacketReceived, this, _1),
                               bind(&SequentialDataFetcher::onDataRetrievalFailure, this, _1, _2));
-    m_manager->processEvents();
   }
+  m_manager->processEvents();
 }
 
 void
@@ -134,26 +136,26 @@ void
 SequentialDataFetcher::onDataRetrievalFailure(const ndn::Interest& interest,
                                               const std::string& errorCode)
 {
-  std::cerr << "Data Retrieval Failed: " << interest.getName() << std::endl;
+  // std::cerr << "Data Retrieval Failed: " << interest.getName() << std::endl;
 
   // Data retrieval failure
   uint32_t nameType = IoUtil::findType(interest.getName());
   if (nameType == IoUtil::TORRENT_FILE) {
     // this should never happen
-    std::cerr << "Torrent File Segment Downloading Failed: " << interest.getName();
+    // std::cerr << "Torrent File Segment Downloading Failed: " << interest.getName();
     this->downloadTorrentFile();
   }
   else if (nameType == IoUtil::FILE_MANIFEST) {
-    std::cerr << "Manifest File Segment Downloading Failed: " << interest.getName();
+    // std::cerr << "Manifest File Segment Downloading Failed: " << interest.getName();
     this->downloadManifestFiles({ interest.getName() });
   }
   else if (nameType == IoUtil::DATA_PACKET) {
-    std::cerr << "Data Packet Downloading Failed: " << interest.getName();
+    // std::cerr << "Data Packet Downloading Failed: " << interest.getName();
     this->downloadPackets({ interest.getName() });
   }
   else {
     // This should never happen
-    std::cerr << "Unknown Packet Type Downloading Failed: " << interest.getName();
+    // std::cerr << "Unknown Packet Type Downloading Failed: " << interest.getName();
   }
 }
 
