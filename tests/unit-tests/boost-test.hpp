@@ -26,8 +26,24 @@
 #pragma GCC system_header
 #pragma clang system_header
 
-#include <boost/test/unit_test.hpp>
+#include "util/logging.hpp"
+
 #include <boost/concept_check.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
 #include <boost/test/output_test_stream.hpp>
+#include <boost/test/unit_test.hpp>
+
+
+struct NtorrentGlobalConfig {
+  NtorrentGlobalConfig() {
+    ndn::ntorrent::LoggingUtil::init();
+    boost::log::add_common_attributes();
+  }
+
+  ~NtorrentGlobalConfig() {
+  }
+};
+
+BOOST_GLOBAL_FIXTURE(NtorrentGlobalConfig);
 
 #endif // NTORRENT_TESTS_BOOST_TEST_HPP

@@ -29,13 +29,13 @@ def configure(conf):
     conf.check_cfg(package='libndn-cxx', args=['--cflags', '--libs'],
                    uselib_store='NDN_CXX', mandatory=True)
 
-    boost_libs = 'system random thread filesystem'
+    boost_libs = 'system random thread filesystem log log_setup'
     if conf.options.with_tests:
         conf.env['WITH_TESTS'] = 1
         conf.define('WITH_TESTS', 1);
         boost_libs += ' unit_test_framework'
 
-    conf.check_boost(lib=boost_libs)
+    conf.check_boost(lib=boost_libs, mt=True)
     if conf.env.BOOST_VERSION_NUMBER < 104800:
         Logs.error("Minimum required boost version is 1.48.0")
         Logs.error("Please upgrade your distribution or install custom boost libraries" +
@@ -48,8 +48,6 @@ def configure(conf):
     conf.write_config_header('src/config.h')
 
 def build (bld):
-    feature_list = 'cxx'
-
     bld(
         features='cxx',
         name='nTorrent',
@@ -64,12 +62,7 @@ def build (bld):
       target='ntorrent',
       features='cxx cxxprogram',
       source='src/main.cpp',
-      use = 'BOOST nTorrent')
-
-    if bld.env["WITH_TESTS"]:
-        feature_list += ' cxxstlib'
-    else:
-        feature_list += ' cxxprogram'
+      use = 'nTorrent')
 
     # Unit tests
     if bld.env["WITH_TESTS"]:
@@ -77,7 +70,7 @@ def build (bld):
           target="unit-tests",
           source = bld.path.ant_glob(['tests/**/*.cpp']),
           features=['cxx', 'cxxprogram'],
-          use = 'BOOST nTorrent',
+          use = 'nTorrent',
           includes = "src .",
           install_path = None
           )

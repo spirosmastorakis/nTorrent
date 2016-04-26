@@ -20,6 +20,7 @@
 */
 
 #include "update-handler.hpp"
+#include "util/logging.hpp"
 
 #include <ndn-cxx/security/signing-helpers.hpp>
 
@@ -106,7 +107,7 @@ UpdateHandler::decodeDataPacketContent(const Interest& interest, const Data& dat
   // RoutableName ::= NAME-TYPE TLV-LENGTH
   //                  Name
 
-  std::cout << "ALIVE data packet received: " << data.getName() << std::endl;
+  LOG_INFO << "ALIVE data packet received: " << data.getName() << std::endl;
 
   if (data.getContentType() != tlv::ContentType_Blob) {
       BOOST_THROW_EXCEPTION(Error("Expected Content Type Blob"));
@@ -160,7 +161,7 @@ UpdateHandler::learnOwnRoutablePrefix()
   };
 
   auto prefixRetrievalFailed = [this] (const Interest&) {
-    std::cerr << "Own Routable Prefix Retrieval Failed. Trying again." << std::endl;
+    LOG_ERROR << "Own Routable Prefix Retrieval Failed. Trying again." << std::endl;
     // TODO(Spyros): This could lead to an infinite loop. Figure out something better...
     this->learnOwnRoutablePrefix();
   };
@@ -172,7 +173,7 @@ UpdateHandler::learnOwnRoutablePrefix()
 void
 UpdateHandler::onInterestReceived(const InterestFilter& filter, const Interest& interest)
 {
-  std::cout << "Interest Received: " << interest.getName().toUri() << std::endl;
+  LOG_INFO << "Interest Received: " << interest.getName().toUri() << std::endl;
   shared_ptr<Data> data = this->createDataPacket(interest.getName());
   m_keyChain->sign(*data, signingWithSha256());
   m_face->put(*data);
@@ -181,7 +182,7 @@ UpdateHandler::onInterestReceived(const InterestFilter& filter, const Interest& 
 void
 UpdateHandler::onRegisterFailed(const Name& prefix, const std::string& reason)
 {
-  std::cerr << "ERROR: Failed to register prefix \""
+ LOG_ERROR << "ERROR: Failed to register prefix \""
             << prefix << "\" in local hub's daemon (" << reason << ")"
             << std::endl;
   m_face->shutdown();

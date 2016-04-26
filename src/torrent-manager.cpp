@@ -3,6 +3,7 @@
 #include "file-manifest.hpp"
 #include "torrent-file.hpp"
 #include "util/io-util.hpp"
+#include "util/logging.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -613,7 +614,7 @@ TorrentManager::onInterestReceived(const InterestFilter& filter, const Interest&
   }
   else {
     // TODO(msweatt) NACK
-    std::cerr << "NACK: " << interest << std::endl;
+    LOG_ERROR << "NACK: " << interest << std::endl;
   }
   return;
 }
@@ -621,7 +622,7 @@ TorrentManager::onInterestReceived(const InterestFilter& filter, const Interest&
 void
 TorrentManager::onRegisterFailed(const Name& prefix, const std::string& reason)
 {
-  std::cerr << "ERROR: Failed to register prefix \""
+  LOG_ERROR << "ERROR: Failed to register prefix \""
             << prefix << "\" in local hub's daemon (" << reason << ")"
             << std::endl;
   m_face->shutdown();

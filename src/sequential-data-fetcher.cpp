@@ -20,6 +20,7 @@
 */
 
 #include "sequential-data-fetcher.hpp"
+#include "util/logging.hpp"
 #include "util/io-util.hpp"
 
 namespace ndn {
@@ -67,7 +68,7 @@ SequentialDataFetcher::downloadTorrentFile()
   std::vector<ndn::Name> returnedNames;
   returnedNames = m_manager->downloadTorrentFile(".appdata/torrent_files/");
   if (!returnedNames.empty() && IoUtil::NAME_TYPE::FILE_MANIFEST == IoUtil::findType(returnedNames[0])) {
-    std::cout << "Torrent File Received: "
+    LOG_INFO  << "Torrent File Received: "
               << m_torrentFileName.getSubName(0, m_torrentFileName.size() - 1) << std::endl;
   }
   return returnedNames;
@@ -121,13 +122,13 @@ void
 SequentialDataFetcher::onDataPacketReceived(const ndn::Data& data)
 {
   // Data Packet Received
-  std::cout << "Data Packet Received: " << data.getName();
+  LOG_INFO << "Data Packet Received: " << data.getName();
 }
 
 void
 SequentialDataFetcher::onManifestReceived(const std::vector<Name>& packetNames)
 {
-  std::cout << "Manifest File Received: "
+  LOG_INFO << "Manifest File Received: "
             << packetNames[0].getSubName(0, packetNames[0].size()- 3) << std::endl;
   this->downloadPackets(packetNames);
 }
@@ -136,26 +137,32 @@ void
 SequentialDataFetcher::onDataRetrievalFailure(const ndn::Interest& interest,
                                               const std::string& errorCode)
 {
-  // std::cerr << "Data Retrieval Failed: " << interest.getName() << std::endl;
-
   // Data retrieval failure
   uint32_t nameType = IoUtil::findType(interest.getName());
   if (nameType == IoUtil::TORRENT_FILE) {
     // this should never happen
-    // std::cerr << "Torrent File Segment Downloading Failed: " << interest.getName();
+    LOG_ERROR << "Torrent File Segment Downloading Failed: " << interest.getName();
     this->downloadTorrentFile();
   }
   else if (nameType == IoUtil::FILE_MANIFEST) {
-    // std::cerr << "Manifest File Segment Downloading Failed: " << interest.getName();
+    LOG_ERROR << "Manifest File Segment Downloading Failed: " << interest.getName();
     this->downloadManifestFiles({ interest.getName() });
   }
   else if (nameType == IoUtil::DATA_PACKET) {
-    // std::cerr << "Data Packet Downloading Failed: " << interest.getName();
+    LOG_ERROR << "Torrent File Segment Downloading Failed: " << interest.getName();
+    this->downloadTorrentFile();
+  }
+  else if (nameType == IoUtil::FILE_MANIFEST) {
+    LOG_ERROR << "Manifest File Segment Downloading Failed: " << interest.getName();
+    this->downloadManifestFiles({ interest.getName() });
+  }
+  else if (nameType == IoUtil::DATA_PACKET) {
+    LOG_ERROR << "Data Packet Downloading Failed: " << interest.getName();
     this->downloadPackets({ interest.getName() });
   }
   else {
     // This should never happen
-    // std::cerr << "Unknown Packet Type Downloading Failed: " << interest.getName();
+    LOG_ERROR << "Unknown Packet Type Downloading Failed: " << interest.getName();
   }
 }
 

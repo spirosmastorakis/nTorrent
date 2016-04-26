@@ -2,6 +2,7 @@
 
 #include "file-manifest.hpp"
 #include "torrent-file.hpp"
+#include "util/logging.hpp"
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -148,7 +149,7 @@ IoUtil::writeData(const Data& packet, const FileManifest& manifest, size_t subMa
     return true;
   }
   catch (io::Error &e) {
-    std::cerr << e.what() << std::endl;
+    LOG_ERROR << e.what() << std::endl;
     return false;
   }
 }
@@ -166,14 +167,14 @@ IoUtil::readDataPacket(const Name& packetFullName,
   is.sync();
   is.seekg(start_offset + packetNum * dataPacketSize);
   if (is.tellg() < 0) {
-    std::cerr << "bad seek" << std::endl;
+    LOG_ERROR << "bad seek" << std::endl;
   }
  // read contents
  std::vector<char> bytes(dataPacketSize);
  is.read(&bytes.front(), dataPacketSize);
  auto read_size = is.gcount();
  if (is.bad() || read_size < 0) {
-  std::cerr << "Bad read" << std::endl;
+  LOG_ERROR << "Bad read" << std::endl;
   return nullptr;
  }
  // construct packet

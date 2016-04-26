@@ -23,6 +23,7 @@
 #include "sequential-data-fetcher.hpp"
 #include "torrent-file.hpp"
 #include "util/io-util.hpp"
+#include "util/logging.hpp"
 
 #include <iostream>
 #include <iterator>
@@ -31,8 +32,11 @@
 
 #include <boost/program_options.hpp>
 #include <boost/program_options/errors.hpp>
+#include <boost/log/utility/setup/common_attributes.hpp>
 
+namespace logging = boost::log;
 namespace po = boost::program_options;
+
 using namespace ndn::ntorrent;
 
 namespace ndn {
@@ -53,6 +57,9 @@ public:
 int main(int argc, char *argv[])
 {
   try {
+   LoggingUtil::init();
+   logging::add_common_attributes();
+
     po::options_description desc("Allowed options");
     desc.add_options()
     // TODO(msweatt) Consider  adding  flagged args for other parameters
@@ -100,14 +107,14 @@ int main(int argc, char *argv[])
       // write all the torrent segments
       for (const TorrentFile& t : torrentSegments) {
         if (!IoUtil::writeTorrentSegment(t, torrentPath)) {
-          std::cerr << "Write failed: " << t.getName() << std::endl;
+          LOG_ERROR << "Write failed: " << t.getName() << std::endl;
           return -1;
         }
       }
       auto manifestPath = outputPath + "/manifests/";
       for (const FileManifest& m : manifests) {
         if (!IoUtil::writeFileManifest(m, manifestPath)) {
-          std::cerr << "Write failed: " << m.getName() << std::endl;
+          LOG_ERROR << "Write failed: " << m.getName() << std::endl;
           return -1;
         }
       }
