@@ -56,7 +56,7 @@ class SequentialDataFetcher : FetchingStrategyManager {
      * @brief Start the sequential data fetcher
      */
     void
-    start();
+    start(const time::milliseconds& timeout = time::milliseconds::zero());
 
     /**
      * @brief Pause the sequential data fetcher
@@ -70,11 +70,8 @@ class SequentialDataFetcher : FetchingStrategyManager {
     void
     resume();
 
-    void
-    seed(const time::milliseconds& timeout = time::milliseconds::zero()) const;
-
   protected:
-    std::vector<ndn::Name>
+    void
     downloadTorrentFile();
 
     void
@@ -95,18 +92,14 @@ class SequentialDataFetcher : FetchingStrategyManager {
     virtual void
     onManifestReceived(const std::vector<Name>& packetNames);
 
+    virtual void
+    onTorrentFileSegmentReceived(const std::vector<Name>& manifestNames);
+
   private:
     std::string m_dataPath;
     ndn::Name m_torrentFileName;
     shared_ptr<TorrentManager> m_manager;
 };
-
-inline
-void
-SequentialDataFetcher::seed(const time::milliseconds& timeout) const
-{
-  m_manager->processEvents(timeout);
-}
 
 } // namespace ntorrent
 } // namespace ndn

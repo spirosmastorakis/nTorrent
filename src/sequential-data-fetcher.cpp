@@ -39,11 +39,12 @@ SequentialDataFetcher::~SequentialDataFetcher()
 }
 
 void
-SequentialDataFetcher::start()
+SequentialDataFetcher::start(const time::milliseconds& timeout)
 {
   m_manager->Initialize();
   // downloading logic
   this->implementSequentialLogic();
+  m_manager->processEvents(timeout);
 }
 
 void
@@ -62,28 +63,24 @@ SequentialDataFetcher::resume()
   throw(Error("Not implemented yet"));
 }
 
-std::vector<ndn::Name>
+void
 SequentialDataFetcher::downloadTorrentFile()
 {
-  std::vector<ndn::Name> returnedNames;
-  returnedNames = m_manager->downloadTorrentFile(".appdata/torrent_files/");
-  if (!returnedNames.empty() && IoUtil::NAME_TYPE::FILE_MANIFEST == IoUtil::findType(returnedNames[0])) {
-    LOG_INFO  << "Torrent File Received: "
-              << m_torrentFileName.getSubName(0, m_torrentFileName.size() - 1) << std::endl;
-  }
-  return returnedNames;
+  auto torrentPath = ".appdata/" + m_torrentFileName.get(-3).toUri() + "/torrent_files/";
+  m_manager->downloadTorrentFile(torrentPath,
+                                 bind(&SequentialDataFetcher::onTorrentFileSegmentReceived, this, _1),
+                                 bind(&SequentialDataFetcher::onDataRetrievalFailure, this, _1, _2));
 }
 
 void
-SequentialDataFetcher::downloadManifestFiles(const std::vector<ndn::Name>& manifestsName)
+SequentialDataFetcher::downloadManifestFiles(const std::vector<ndn::Name>& manifestNames)
 {
-  std::vector<ndn::Name> packetsName;
-  for (auto i = manifestsName.begin(); i != manifestsName.end(); i++) {
+  auto manifestPath = ".appdata/" + m_torrentFileName.get(-3).toUri() + "/manifests/";
+  for (auto i = manifestNames.begin(); i != manifestNames.end(); i++) {
     m_manager->download_file_manifest(*i,
-                              ".appdata/manifests/",
+                              manifestPath,
                               bind(&SequentialDataFetcher::onManifestReceived, this, _1),
                               bind(&SequentialDataFetcher::onDataRetrievalFailure, this, _1, _2));
-    m_manager->processEvents();
   }
 }
 
@@ -95,26 +92,37 @@ SequentialDataFetcher::downloadPackets(const std::vector<ndn::Name>& packetsName
                               bind(&SequentialDataFetcher::onDataPacketReceived, this, _1),
                               bind(&SequentialDataFetcher::onDataRetrievalFailure, this, _1, _2));
   }
-  m_manager->processEvents();
 }
 
 void
 SequentialDataFetcher::implementSequentialLogic() {
-  std::vector<ndn::Name> returnedNames;
-  returnedNames = this->downloadTorrentFile();
-  if (returnedNames.empty()) {
-    // we have downloaded the entire torrent (including manifests, data packets, etc..)
-    return;
-  }
-  // check the first returned name whether it is the name of a file manifest or a data packet
-  const Name& nameToCheck = returnedNames[0];
-  if (IoUtil::findType(nameToCheck) == IoUtil::DATA_PACKET) {
-    // In this case, the returned names correspond to data packets
-    this->downloadPackets(returnedNames);
+  // TODO(?) Fix seeding, and implement windowing:
+  /*
+  Alex says look at ndn-cxx:
+  * fetcher with queue (with window)
+  * segment fetcher ?
+  * catchunks (pipeline?)
+  */
+  if (!m_manager->hasAllTorrentSegments()) {
+    this->downloadTorrentFile();
   }
   else {
-    // In this case, the returned names correspond to file manifests
-    this->downloadManifestFiles(returnedNames);
+    LOG_INFO <<  m_torrentFileName << " complete" <<  std::endl;
+    std::vector<ndn::Name> namesToFetch;
+    m_manager->findFileManifestsToDownload(namesToFetch);
+    if (!namesToFetch.empty()) {
+      this->downloadManifestFiles(namesToFetch);
+    }
+    else {
+      LOG_INFO << "All manifests complete" <<  std::endl;
+      m_manager->findAllMissingDataPackets(namesToFetch);
+      if (!namesToFetch.empty()) {
+        this->downloadPackets(namesToFetch);
+      }
+      else {
+        LOG_INFO << "All data complete" <<  std::endl;
+      }
+    }
   }
 }
 
@@ -123,6 +131,12 @@ SequentialDataFetcher::onDataPacketReceived(const ndn::Data& data)
 {
   // Data Packet Received
   LOG_INFO << "Data Packet Received: " << data.getName();
+}
+
+void
+SequentialDataFetcher::onTorrentFileSegmentReceived(const std::vector<Name>& manifestNames)
+{
+  this->downloadManifestFiles(manifestNames);
 }
 
 void

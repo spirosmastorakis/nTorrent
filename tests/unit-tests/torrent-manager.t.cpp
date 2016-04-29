@@ -78,10 +78,6 @@ public:
     return TorrentManager::findManifestSegmentToDownload(manifestName);
   }
 
-  bool dataAlreadyDownloaded(const Name& name) {
-    return TorrentManager::dataAlreadyDownloaded(name);
-  }
-
   std::vector<bool> fileState(const ndn::Name& manifestName) {
     auto fout = m_fileStates[manifestName].first;
     if (nullptr != fout) {
@@ -212,6 +208,7 @@ BOOST_AUTO_TEST_CASE(CheckInitializeComplete)
                                face);
 
     manager.Initialize();
+    BOOST_CHECK(manager.hasAllTorrentSegments());
 
     advanceClocks(time::milliseconds(1), 10);
     manager.sendRoutablePrefixResponse();
@@ -240,6 +237,8 @@ BOOST_AUTO_TEST_CASE(CheckInitializeEmpty)
 
   advanceClocks(time::milliseconds(1), 10);
   manager.sendRoutablePrefixResponse();
+
+  BOOST_CHECK(!manager.hasAllTorrentSegments());
 
   BOOST_CHECK(manager.torrentSegments() == vector<TorrentFile>());
   BOOST_CHECK(manager.fileManifests()   == vector<FileManifest>());
@@ -295,6 +294,7 @@ BOOST_AUTO_TEST_CASE(CheckInitializeNoManifests)
                                face);
 
     manager.Initialize();
+    BOOST_CHECK(manager.hasAllTorrentSegments());
 
     advanceClocks(time::milliseconds(1), 10);
     manager.sendRoutablePrefixResponse();
@@ -370,6 +370,7 @@ BOOST_AUTO_TEST_CASE(CheckInitializeMissingManifests)
                                face);
 
     manager.Initialize();
+    BOOST_CHECK(manager.hasAllTorrentSegments());
 
     advanceClocks(time::milliseconds(1), 10);
     manager.sendRoutablePrefixResponse();
@@ -416,6 +417,7 @@ BOOST_AUTO_TEST_CASE(TestDownloadingTorrentFile)
                              filePath, face);
 
   manager.Initialize();
+  BOOST_CHECK(!manager.hasAllTorrentSegments());
 
   advanceClocks(time::milliseconds(1), 10);
   manager.sendRoutablePrefixResponse();
@@ -440,7 +442,7 @@ BOOST_AUTO_TEST_CASE(TestDownloadingTorrentFile)
     advanceClocks(time::milliseconds(1), 40);
     face->receive(dynamic_cast<Data&>(*i));
   }
-
+  BOOST_CHECK(manager.hasAllTorrentSegments());
   fs::remove_all(filePath);
   fs::remove_all(".appdata");
 }
@@ -602,7 +604,8 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload1)
   BOOST_CHECK(!(manager.findTorrentFileSegmentToDownload()));
 
   std::vector<Name> manifests;
-  manifests = manager.downloadTorrentFile("/test");
+  manager.downloadTorrentFile("/test");
+  manager.findFileManifestsToDownload(manifests);
 
   BOOST_CHECK_EQUAL(manifests[0].toUri(), "/manifest1");
   BOOST_CHECK_EQUAL(manifests[1].toUri(), "/manifest2");
@@ -628,96 +631,6 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload2)
 
   BOOST_CHECK_EQUAL(manager.findTorrentFileSegmentToDownload()->toUri(),
                     "/NTORRENT/test/torrent-file/0/sha256digest");
-
-  fs::remove_all(filePath);
-  fs::remove_all(".appdata");
-}
-
-// we have the torrent file and the manifests
-BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload3)
-{
-  vector<FileManifest> manifests;
-  vector<TorrentFile>  torrentSegments;
-  // for each file, the data packets
-  std::vector<vector<Data>> fileData;
-  std::string filePath = "tests/testdata/temp";
-  // get torrent files and manifests
-  {
-    auto temp = TorrentFile::generate("tests/testdata/foo",
-                                      1024,
-                                      2048,
-                                      8192,
-                                      true);
-    torrentSegments = temp.first;
-    auto temp1      = temp.second;
-    for (const auto& ms : temp1) {
-      manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
-      fileData.push_back(ms.second);
-    }
-  }
-  // write the torrent segments and manifests to disk
-  std::string dirPath = ".appdata/foo/";
-  boost::filesystem::create_directories(dirPath);
-  std::string torrentPath = dirPath + "torrent_files/";
-  boost::filesystem::create_directories(torrentPath);
-  auto fileNum = 0;
-  for (const auto& t : torrentSegments) {
-    fileNum++;
-    auto filename = torrentPath + to_string(fileNum);
-    io::save(t, filename);
-  }
-
-  auto manifestPath = dirPath + "manifests/";
-  boost::filesystem::create_directory(manifestPath);
-  for (const auto& m : manifests) {
-    fs::path filename = manifestPath + m.file_name() + to_string(m.submanifest_number());
-    boost::filesystem::create_directory(filename.parent_path());
-    io::save(m, filename.string());
-  }
-  // Initialize manager
-  TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=a8a2e98cd943d895b8c4b12a208343bcf9344ce85a6376dc6f5754fe8f4a573e",
-                             filePath,
-                             face);
-
-  manager.Initialize();
-
-  advanceClocks(time::milliseconds(1), 10);
-  manager.sendRoutablePrefixResponse();
-
-  // Set the file state
-  std::vector<bool> v1 = {true};
-  manager.setFileState(manifests[0].getFullName(), make_shared<fs::fstream>(), v1);
-
-  std::vector<bool> v2 = {false, true, true, false, false, false};
-  manager.setFileState(manifests[1].getFullName(), make_shared<fs::fstream>(), v2);
-
-  std::vector<bool> v3 = {true, false, false, false, false, false};
-  manager.setFileState(manifests[2].getFullName(), make_shared<fs::fstream>(), v3);
-
-  manager.downloadTorrentFile(filePath + "torrent_files/",
-                                 [&manifests](const std::vector<ndn::Name>& vec) {
-                                   BOOST_CHECK_EQUAL(vec[0].toUri(),
-                                                     manifests[1].catalog()[0].toUri());
-                                   BOOST_CHECK_EQUAL(vec[1].toUri(),
-                                                     manifests[1].catalog()[3].toUri());
-                                   BOOST_CHECK_EQUAL(vec[2].toUri(),
-                                                     manifests[1].catalog()[4].toUri());
-                                   BOOST_CHECK_EQUAL(vec[3].toUri(),
-                                                     manifests[1].catalog()[5].toUri());
-                                   BOOST_CHECK_EQUAL(vec[4].toUri(),
-                                                     manifests[2].catalog()[1].toUri());
-                                   BOOST_CHECK_EQUAL(vec[5].toUri(),
-                                                     manifests[2].catalog()[2].toUri());
-                                   BOOST_CHECK_EQUAL(vec[6].toUri(),
-                                                     manifests[2].catalog()[3].toUri());
-                                   BOOST_CHECK_EQUAL(vec[7].toUri(),
-                                                     manifests[2].catalog()[4].toUri());
-                                   BOOST_CHECK_EQUAL(vec[8].toUri(),
-                                                     manifests[2].catalog()[5].toUri());
-                                 },
-                                 [](const ndn::Name& name, const std::string& reason) {
-                                   BOOST_FAIL("Unexpected failure");
-                                 });
 
   fs::remove_all(filePath);
   fs::remove_all(".appdata");
@@ -946,6 +859,7 @@ BOOST_AUTO_TEST_CASE(TestDataAlreadyDownloaded)
                              face);
 
   manager.Initialize();
+  BOOST_CHECK(manager.hasAllTorrentSegments());
 
   advanceClocks(time::milliseconds(1), 10);
   manager.sendRoutablePrefixResponse();
@@ -965,14 +879,14 @@ BOOST_AUTO_TEST_CASE(TestDataAlreadyDownloaded)
   p1.appendSequenceNumber(0);
   p1 = Name(p1.toUri() + "/sha256digest");
 
-  BOOST_CHECK(!(manager.dataAlreadyDownloaded(p1)));
+  BOOST_CHECK(!(manager.hasDataPacket(p1)));
 
   Name p2("NTORRENT/foo/bar.txt");
   p2.appendSequenceNumber(0);
   p2.appendSequenceNumber(0);
   p2 = Name(p2.toUri() + "/sha256digest");
 
-  BOOST_CHECK(manager.dataAlreadyDownloaded(p2));
+  BOOST_CHECK(manager.hasDataPacket(p2));
 }
 
 BOOST_AUTO_TEST_CASE(CheckSeedComplete)
@@ -1061,7 +975,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
                             }));
       advanceClocks(time::milliseconds(1), 40);
       face->receive(interest);
-      manager.processEvents();
+      manager.processEvents(time::milliseconds(-1));
       // check that one piece of data is sent, and it is what was expected
       BOOST_CHECK_EQUAL(++nData, face->sentData.size());
       face->receive(face->sentData[nData - 1]);
@@ -1083,7 +997,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
                              }));
       advanceClocks(time::milliseconds(1), 40);
       face->receive(interest);
-      manager.processEvents();
+      manager.processEvents(time::milliseconds(-1));
       // check that one piece of data is sent, and it is what was expected
       BOOST_CHECK_EQUAL(++nData, face->sentData.size());
       face->receive(face->sentData[nData - 1]);
@@ -1104,7 +1018,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
                              }));
         advanceClocks(time::milliseconds(1), 40);
         face->receive(interest);
-        manager.processEvents();
+        manager.processEvents(time::milliseconds(-1));
         // check that one piece of data is sent, and it is what was expected
         BOOST_CHECK_EQUAL(++nData, face->sentData.size());
         face->receive(face->sentData[nData - 1]);
@@ -1188,7 +1102,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedRandom)
                           }));
     advanceClocks(time::milliseconds(1), 40);
     face->receive(interest);
-    manager.processEvents();
+    manager.processEvents(time::milliseconds(-1));
     // check that one piece of data is sent, and it is what was expected
     BOOST_CHECK_EQUAL(++nData, face->sentData.size());
     face->receive(face->sentData[nData - 1]);

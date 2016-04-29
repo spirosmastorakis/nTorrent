@@ -18,8 +18,6 @@
  *
  * See AUTHORS.md for complete list of nTorrent authors and contributors.
  */
-
-
 #include "sequential-data-fetcher.hpp"
 #include "torrent-file.hpp"
 #include "util/io-util.hpp"
@@ -37,6 +35,7 @@
 namespace logging = boost::log;
 namespace po = boost::program_options;
 
+using namespace ndn;
 using namespace ndn::ntorrent;
 
 namespace ndn {
@@ -66,6 +65,7 @@ int main(int argc, char *argv[])
       ("help,h", "produce help message")
       ("generate,g" , "-g <data directory> <output-path>? <names-per-segment>? <names-per-manifest-segment>? <data-packet-size>?")
       ("seed,s", "After download completes, continue to seed")
+      ("dump,d", "-d <file> Dump the contents of the Data stored at the <file>.")
       ("args", po::value<std::vector<std::string> >(), "For arguments you want to specify without flags")
     ;
     po::positional_options_description p;
@@ -80,60 +80,70 @@ int main(int argc, char *argv[])
         std::cout << desc << std::endl;
         return 1;
     }
-    // if generate mode
-    if (vm.count("generate") && vm.count("args")) {
+    if (vm.count("args")) {
       auto args = vm["args"].as<std::vector<std::string>>();
-      if (args.size() < 1 || args.size() > 5) {
-        throw ndn::Error("wrong number of arguments for generate");
-      }
-      auto dataPath         = args[0];
-      auto outputPath       = args.size() >= 2 ? args[1] : ".appdata/";
-      auto namesPerSegment  = args.size() >= 3 ? boost::lexical_cast<size_t>(args[2]) : 1024;
-      auto namesPerManifest = args.size() >= 4 ? boost::lexical_cast<size_t>(args[3]) : 1024;
-      auto dataPacketSize   = args.size() == 5 ? boost::lexical_cast<size_t>(args[4]) : 1024;
+      // if generate mode
+      if (vm.count("generate")) {
+        if (args.size() < 1 || args.size() > 5) {
+          throw ndn::Error("wrong number of arguments for generate");
+        }
+        auto dataPath         = args[0];
+        auto outputPath       = args.size() >= 2 ? args[1] : ".appdata/";
+        auto namesPerSegment  = args.size() >= 3 ? boost::lexical_cast<size_t>(args[2]) : 1024;
+        auto namesPerManifest = args.size() >= 4 ? boost::lexical_cast<size_t>(args[3]) : 1024;
+        auto dataPacketSize   = args.size() == 5 ? boost::lexical_cast<size_t>(args[4]) : 1024;
 
-      const auto& content = TorrentFile::generate(dataPath,
-                                                  namesPerSegment,
-                                                  namesPerManifest,
-                                                  dataPacketSize);
-      const auto& torrentSegments = content.first;
-      std::vector<FileManifest> manifests;
-      for (const auto& ms : content.second) {
-        manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
-      }
-      auto torrentPrefix = fs::canonical(dataPath).filename().string();
-      outputPath += torrentPrefix;
-      auto torrentPath =  outputPath + "/torrent_files/";
-      // write all the torrent segments
-      for (const TorrentFile& t : torrentSegments) {
-        if (!IoUtil::writeTorrentSegment(t, torrentPath)) {
-          LOG_ERROR << "Write failed: " << t.getName() << std::endl;
-          return -1;
+        const auto& content = TorrentFile::generate(dataPath,
+                                                    namesPerSegment,
+                                                    namesPerManifest,
+                                                    dataPacketSize);
+        const auto& torrentSegments = content.first;
+        std::vector<FileManifest> manifests;
+        for (const auto& ms : content.second) {
+          manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
+        }
+        auto torrentPrefix = fs::canonical(dataPath).filename().string();
+        outputPath += torrentPrefix;
+        auto torrentPath =  outputPath + "/torrent_files/";
+        // write all the torrent segments
+        for (const TorrentFile& t : torrentSegments) {
+          if (!IoUtil::writeTorrentSegment(t, torrentPath)) {
+            LOG_ERROR << "Write failed: " << t.getName() << std::endl;
+            return -1;
+          }
+        }
+        auto manifestPath = outputPath + "/manifests/";
+        for (const FileManifest& m : manifests) {
+          if (!IoUtil::writeFileManifest(m, manifestPath)) {
+            LOG_ERROR << "Write failed: " << m.getName() << std::endl;
+            return -1;
+          }
         }
       }
-      auto manifestPath = outputPath + "/manifests/";
-      for (const FileManifest& m : manifests) {
-        if (!IoUtil::writeFileManifest(m, manifestPath)) {
-          LOG_ERROR << "Write failed: " << m.getName() << std::endl;
-          return -1;
+      // if dump mode
+      else if(vm.count("dump")) {
+        if (args.size() != 1) {
+          throw ndn::Error("wrong number of arguments for dump");
+        }
+        auto filePath = args[0];
+        auto data = io::load<Data>(filePath);
+        if (nullptr != data) {
+          std::cout << data->getFullName() << std::endl;
+        }
+        else {
+          throw ndn::Error("Invalid data.");
         }
       }
-    }
-    // otherwise we are in torrent mode if we have the required args, start the sequential fetcher
-    else if (vm.count("args")) {
-      // <torrent-file-name> <data-path>
-      auto args = vm["args"].as<std::vector<std::string>>();
-      if (args.size() != 2) {
-        throw ndn::Error("wrong number of arguments for generate");
-      }
-      auto torrentName = args[0];
-      auto dataPath = args[1];
-      SequentialDataFetcher fetcher(torrentName, dataPath);
-      // download all the code
-      fetcher.start();
-      std::cout << torrentName << " done" <<  std::endl;
-      if (vm.count("seed")) {
-        fetcher.seed();
+      // standard torrent mode
+      else {
+        // <torrent-file-name> <data-path>
+        if (args.size() != 2) {
+          throw ndn::Error("wrong number of arguments for torrent");
+        }
+        auto torrentName = args[0];
+        auto dataPath = args[1];
+        SequentialDataFetcher fetcher(torrentName, dataPath);
+        fetcher.start();
       }
     }
     else {

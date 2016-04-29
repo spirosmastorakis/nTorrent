@@ -46,7 +46,7 @@ class FetchingStrategyManager {
      * @brief Method called to start the torrent downloading
      */
     virtual void
-    start() = 0;
+    start(const time::milliseconds& timeout = time::milliseconds::zero()) = 0;
 
     /**
      * @brief Method called to pause the torrent downloading
@@ -67,13 +67,6 @@ class FetchingStrategyManager {
     struct status {
       double downloadedPercent;
     };
-    /**
-     * @brief Seed downloaded data for the specified timeout.
-     * By default this will go into an infinite loop.
-     */
-    virtual void
-    seed(const time::milliseconds& timeout = time::milliseconds::zero()) const = 0;
-
   private:
     /**
      * @brief Callback to be called when data is received
@@ -86,6 +79,12 @@ class FetchingStrategyManager {
      */
     virtual void
     onDataRetrievalFailure(const ndn::Interest& interest, const std::string& errorCode) = 0;
+
+    /**
+     * @brief Callback to be called when a torrent file segment is received
+     */
+    virtual void
+    onTorrentFileSegmentReceived(const std::vector<Name>& manifestNames) = 0;
 
     /**
      * @brief Callback to be called when a file manifest is received

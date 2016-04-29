@@ -80,14 +80,71 @@ class TorrentManager : noncopyable {
   void
   Initialize();
 
+  /**
+   * brief Return 'true' if all segments of the torrent file downloaded, 'false' otherwise.
+   */
+  bool
+  hasAllTorrentSegments() const;
+
   /*
-   * @brief Download the torrent file
-   * @param path The path to write the downloaded segments
-   * @return A vector of the file manifest names contained in the torrent file
+   * \brief Given a data packet name, find whether we have already downloaded this packet
+   * @param dataName The name of the data packet to download
+   * @return True if we have already downloaded this packet, false otherwise
    *
    */
-  std::vector<Name>
-  downloadTorrentFile(const std::string& path);
+  bool
+  hasDataPacket(const Name& dataName) const;
+
+  /*
+   * \brief Find the torrent file segment that we should download
+   *        (either we have nothing or we have them all)
+   * @return A shared_ptr to the name of the segment to download or
+   *         nullptr if we have all the segments
+   *
+   */
+  shared_ptr<Name>
+  findTorrentFileSegmentToDownload() const;
+
+  /*
+   * \brief Given a file manifest segment name, find the next file manifest segment
+   *        that we should download
+   * @param manifestName The name of the file manifest segment that we want to download
+   * @return A shared_ptr to the name of the segment to download or
+   *         nullptr if we have all the segments
+   *
+   */
+  shared_ptr<Name>
+  findManifestSegmentToDownload(const Name& manifestName) const;
+
+  /*
+   * \brief Find the segments of all the file manifests that we are missing
+   * @param manifestNames The name of the manifest file segments to download (currently missing)
+   *                      This parameter is used as an output vector of names
+   */
+  void
+  findFileManifestsToDownload(std::vector<Name>& manifestNames) const;
+
+  /*
+   * \brief Find the names of the data packets of a file manifest that we are currently missing
+   * @param manifestName The name of the manifest
+   * @param packetNames The name of the data packets to be downloaded
+   *                    (used as an output vector of names)
+   *
+   * No matter what segment of a manifest file the manifestName parameter might refer to, the
+   * missing data packets starting from the first segment of this manifest file would be returned
+   *
+   */
+  void
+  findDataPacketsToDownload(const Name& manifestName, std::vector<Name>& packetNames) const;
+
+  /*
+   * \brief Find all the data packets that we are currently missing
+   * @param packetNames The name of the data packets to be downloaded
+   *                    (used as an output vector of names)
+   *
+   */
+  void
+  findAllMissingDataPackets(std::vector<Name>& packetNames) const;
 
   /*
    * @brief Download the torrent file
@@ -100,12 +157,11 @@ class TorrentManager : noncopyable {
    *                 failed to download and a failure reason to the callback
    *
    * This method provides non-blocking downloading of all the torrent file segments
-   *
    */
   void
   downloadTorrentFile(const std::string& path,
-                      TorrentFileReceivedCallback onSuccess,
-                      FailedCallback onFailed);
+                      TorrentFileReceivedCallback onSuccess = {},
+                      FailedCallback onFailed = {});
 
   /*
    * @brief Download a file manifest
@@ -149,10 +205,10 @@ class TorrentManager : noncopyable {
 
   /**
    * @brief Process any data to receive or call timeout callbacks and update prefix list (if needed)
-   * By default only process pending events and return immediately, optionally specify a timeout.
+   * By default this blocks until all operations are complete.
    */
   void
-  processEvents(const time::milliseconds& timeout = time::milliseconds(-1));
+  processEvents(const time::milliseconds& timeout = time::milliseconds(0));
 
  protected:
   /**
@@ -192,23 +248,15 @@ class TorrentManager : noncopyable {
    * \brief Download the segments of the torrent file
    * @param name The name of the torrent file to be downloaded
    * @param path The path to write the torrent file on disk
-   * @param manifestNames A vector containing the name of the manifests in the torrent file.
-   *                      This parameter will be updated every time we receive a torrent
-   *                      file segment
-   * @param async Blocking (sync) or non-blocking (async) operation
    * @param onSuccess Optional callback to be called when all the segments of the torrent file
-   *                  have been downloaded. The default value is an empty callack. A callback
-   *                  should be specified when async is false
+   *                  have been downloaded. The default value is an empty callback.
    * @param onFailed Optional callback to be called when we fail to download a segment of the
-   *                 torrent file. The default value is an empty callack. A callback should be
-   *                 specified when async is false
+   *                 torrent file. The default value is an empty callback.
    *
    */
   void
   downloadTorrentFileSegment(const ndn::Name& name,
                              const std::string& path,
-                             std::shared_ptr<std::vector<Name>> manifestNames,
-                             bool async,
                              TorrentFileReceivedCallback onSuccess,
                              FailedCallback onFailed);
 
@@ -244,6 +292,7 @@ class TorrentManager : noncopyable {
   void
   onRegisterFailed(const Name& prefix, const std::string& reason);
 
+protected:
   // A map from each fileManifest to corresponding file stream on disk and a bitmap of which Data
   // packets this manager currently has
   mutable std::unordered_map<Name,
@@ -259,67 +308,6 @@ class TorrentManager : noncopyable {
   Name                                                                m_torrentFileName;
   // The path to the location on disk of the Data packet for this manager
   std::string                                                         m_dataPath;
-
-protected:
-  /*
-   * \brief Find the torrent file segment that we should download
-   *        (either we have nothing or we have them all)
-   * @return A shared_ptr to the name of the segment to download or
-   *         nullptr if we have all the segments
-   *
-   */
-  shared_ptr<Name>
-  findTorrentFileSegmentToDownload();
-
-  /*
-   * \brief Given a file manifest segment name, find the next file manifest segment
-   *        that we should download
-   * @param manifestName The name of the file manifest segment that we want to download
-   * @return A shared_ptr to the name of the segment to download or
-   *         nullptr if we have all the segments
-   *
-   */
-  shared_ptr<Name>
-  findManifestSegmentToDownload(const Name& manifestName);
-
-  /*
-   * \brief Given a data packet name, find whether we have already downloaded this packet
-   * @param dataName The name of the data packet to download
-   * @return True if we have already downloaded this packet, false otherwise
-   *
-   */
-  bool
-  dataAlreadyDownloaded(const Name& dataName);
-
-  /*
-   * \brief Find the segments of all the file manifests that we are missing
-   * @param manifestNames The name of the manifest file segments to download (currently missing)
-   *                      This parameter is used as an output vector of names
-   */
-  void
-  findFileManifestsToDownload(std::vector<Name>& manifestNames);
-
-  /*
-   * \brief Find the names of the data packets of a file manifest that we are currently missing
-   * @param manifestName The name of the manifest
-   * @param packetNames The name of the data packets to be downloaded
-   *                    (used as an output vector of names)
-   *
-   * No matter what segment of a manifest file the manifestName parameter might refer to, the
-   * missing data packets starting from the first segment of this manifest file would be returned
-   *
-   */
-  void
-  findDataPacketsToDownload(const Name& manifestName, std::vector<Name>& packetNames);
-
-  /*
-   * \brief Find all the data packets that we are currently missing
-   * @param packetNames The name of the data packets to be downloaded
-   *                    (used as an output vector of names)
-   *
-   */
-  void
-  findAllMissingDataPackets(std::vector<Name>& packetNames);
 
 private:
   shared_ptr<Interest>
@@ -337,8 +325,9 @@ private:
   uint64_t                                                            m_sortingCounter;
   // Keychain instance
   shared_ptr<KeyChain>                                                m_keyChain;
-  // Update Handler instance
-  shared_ptr<UpdateHandler>                                           m_updateHandler;
+  // TODO(spyros) Fix and reintegrate update handler
+  // // Update Handler instance
+  // shared_ptr<UpdateHandler>                                           m_updateHandler;
 };
 
 inline
@@ -371,6 +360,13 @@ void
 TorrentManager::processEvents(const time::milliseconds& timeout)
 {
   m_face->processEvents(timeout);
+}
+
+inline
+bool
+TorrentManager::hasAllTorrentSegments() const
+{
+  return findTorrentFileSegmentToDownload() == nullptr;
 }
 
 }  // end ntorrent
