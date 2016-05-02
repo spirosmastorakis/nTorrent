@@ -141,8 +141,9 @@ int main(int argc, char *argv[])
           throw ndn::Error("wrong number of arguments for torrent");
         }
         auto torrentName = args[0];
-        auto dataPath = args[1];
-        SequentialDataFetcher fetcher(torrentName, dataPath);
+        auto dataPath    = args[1];
+        auto seedFlag    = (vm.count("seed") != 0);
+        SequentialDataFetcher fetcher(torrentName, dataPath, seedFlag);
         fetcher.start();
       }
     }

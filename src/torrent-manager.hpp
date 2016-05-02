@@ -38,6 +38,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace fs = boost::filesystem;
@@ -68,6 +69,7 @@ class TorrentManager : noncopyable {
     */
    TorrentManager(const ndn::Name&      torrentFileName,
                   const std::string&    dataPath,
+                  bool                  seed = true,
                   std::shared_ptr<Face> face = nullptr);
 
   /*
@@ -146,6 +148,11 @@ class TorrentManager : noncopyable {
   void
   findAllMissingDataPackets(std::vector<Name>& packetNames) const;
 
+  /*
+   * @brief Stop all network activities of this manager
+   */
+  void
+  shutdown();
   /*
    * @brief Download the torrent file
    * @param path The path to write the downloaded segments
@@ -313,10 +320,12 @@ private:
   shared_ptr<Interest>
   createInterest(Name name);
 
-  // Stats table where routable prefixes are stored
-  StatsTable                                                          m_statsTable;
+  // A flag to determine if upon completion we should continue seeding
+  bool                                                                m_seedFlag;
   // Face used for network communication
   std::shared_ptr<Face>                                               m_face;
+  // Stats table where routable prefixes are stored
+  StatsTable                                                          m_statsTable;
   // Iterator to the routable prefix that we currently use
   StatsTable::iterator                                                m_stats_table_iter;
   // Number of retries per routable prefix
@@ -325,6 +334,8 @@ private:
   uint64_t                                                            m_sortingCounter;
   // Keychain instance
   shared_ptr<KeyChain>                                                m_keyChain;
+
+  std::unordered_set<ndn::Name>                                       m_pendingInterests;
   // TODO(spyros) Fix and reintegrate update handler
   // // Update Handler instance
   // shared_ptr<UpdateHandler>                                           m_updateHandler;
@@ -333,12 +344,14 @@ private:
 inline
 TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
                                const std::string&    dataPath,
+                               bool                  seed,
                                std::shared_ptr<Face> face)
 : m_fileStates()
 , m_torrentSegments()
 , m_fileManifests()
 , m_torrentFileName(torrentFileName)
 , m_dataPath(dataPath)
+, m_seedFlag(seed)
 , m_face(face)
 , m_retries(0)
 , m_sortingCounter(0)
@@ -367,6 +380,14 @@ bool
 TorrentManager::hasAllTorrentSegments() const
 {
   return findTorrentFileSegmentToDownload() == nullptr;
+}
+
+inline
+void
+TorrentManager::shutdown()
+{
+  // TODO(msweatt) Consider unregistering all prefix to exit more gracefully
+  m_face->shutdown();
 }
 
 }  // end ntorrent

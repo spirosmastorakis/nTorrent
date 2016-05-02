@@ -26,12 +26,14 @@
 namespace ndn {
 namespace ntorrent {
 
-SequentialDataFetcher::SequentialDataFetcher(const ndn::Name& torrentFileName,
-                                             const std::string& dataPath)
+SequentialDataFetcher::SequentialDataFetcher(const ndn::Name&   torrentFileName,
+                                             const std::string& dataPath,
+                                             bool               seed)
   : m_dataPath(dataPath)
   , m_torrentFileName(torrentFileName)
+  , m_seedFlag(seed)
 {
-  m_manager = make_shared<TorrentManager>(m_torrentFileName, m_dataPath);
+  m_manager = make_shared<TorrentManager>(m_torrentFileName, m_dataPath, seed);
 }
 
 SequentialDataFetcher::~SequentialDataFetcher()
@@ -121,6 +123,9 @@ SequentialDataFetcher::implementSequentialLogic() {
       }
       else {
         LOG_INFO << "All data complete" <<  std::endl;
+        if (!m_seedFlag) {
+          m_manager->shutdown();
+        }
       }
     }
   }
@@ -136,6 +141,8 @@ SequentialDataFetcher::onDataPacketReceived(const ndn::Data& data)
 void
 SequentialDataFetcher::onTorrentFileSegmentReceived(const std::vector<Name>& manifestNames)
 {
+  // TODO(msweatt) Add parameter for torrent file
+  LOG_INFO << "Torrent Segment Received: " << m_torrentFileName << std::endl;
   this->downloadManifestFiles(manifestNames);
 }
 

@@ -381,6 +381,7 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
 
   auto dataReceived = [path, onSuccess, onFailed, this]
                                             (const Interest& interest, const Data& data) {
+      m_pendingInterests.erase(interest.getName());
       // Stats Table update here...
       m_stats_table_iter->incrementReceivedData();
       m_retries = 0;
@@ -402,6 +403,9 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
       if (nextSegmentPtr != nullptr) {
         this->downloadTorrentFileSegment(*nextSegmentPtr, path, onSuccess, onFailed);
       }
+      if (!m_seedFlag && m_pendingInterests.empty()) {
+        shutdown();
+      }
   };
 
   auto dataFailed = [path, name, onSuccess, onFailed, this]
@@ -418,7 +422,8 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
     }
     this->downloadTorrentFileSegment(name, path, onSuccess, onFailed);
   };
-  LOG_TRACE << "Sending: " << *interest << std::endl;
+  m_pendingInterests.insert(interest->getName());
+  LOG_DEBUG << "Sending: " << *interest << std::endl;
   m_face->expressInterest(*interest, dataReceived, dataFailed);
 }
 
@@ -471,6 +476,7 @@ TorrentManager::download_data_packet(const Name& packetName,
 
   auto dataReceived = [onSuccess, onFailed, this]
                                           (const Interest& interest, const Data& data) {
+    m_pendingInterests.erase(interest.getName());
     // Write data to disk...
     if(writeData(data)) {
       seed(data);
@@ -479,6 +485,9 @@ TorrentManager::download_data_packet(const Name& packetName,
     m_stats_table_iter->incrementReceivedData();
     m_retries = 0;
     onSuccess(data.getName());
+    if (!m_seedFlag && m_pendingInterests.empty()) {
+      shutdown();
+    }
   };
   auto dataFailed = [onFailed, this]
                              (const Interest& interest) {
@@ -491,7 +500,8 @@ TorrentManager::download_data_packet(const Name& packetName,
     }
     onFailed(interest.getName(), "Unknown failure");
   };
-  LOG_TRACE << "Sending: " <<  *interest << std::endl;
+  m_pendingInterests.insert(interest->getName());
+  LOG_DEBUG << "Sending: " <<  *interest << std::endl;
   m_face->expressInterest(*interest, dataReceived, dataFailed);
 }
 
@@ -605,6 +615,7 @@ TorrentManager::downloadFileManifestSegment(const Name& manifestName,
 
   auto dataReceived = [packetNames, path, onSuccess, onFailed, this]
                                           (const Interest& interest, const Data& data) {
+    m_pendingInterests.erase(interest.getName());
     // Stats Table update here...
     m_stats_table_iter->incrementReceivedData();
     m_retries = 0;
@@ -628,6 +639,9 @@ TorrentManager::downloadFileManifestSegment(const Name& manifestName,
     else {
       onSuccess(*packetNames);
     }
+    if (!m_seedFlag && m_pendingInterests.empty()) {
+      shutdown();
+    }
   };
 
   auto dataFailed = [packetNames, path, manifestName, onFailed, this]
@@ -640,7 +654,8 @@ TorrentManager::downloadFileManifestSegment(const Name& manifestName,
     }
     onFailed(interest.getName(), "Unknown failure");
   };
-  LOG_TRACE << "Sending: " <<  *interest << std::endl;
+  m_pendingInterests.insert(interest->getName());
+  LOG_DEBUG << "Sending: " <<  *interest << std::endl;
   m_face->expressInterest(*interest, dataReceived, dataFailed);
 }
 
@@ -648,7 +663,7 @@ void
 TorrentManager::onInterestReceived(const InterestFilter& filter, const Interest& interest)
 {
   // handle if it is a torrent-file
-  LOG_TRACE << "Interest Recevied: " << interest << std::endl;
+  LOG_DEBUG << "Interest Recevied: " << interest << std::endl;
   const auto& interestName = interest.getName();
   std::shared_ptr<Data> data = nullptr;
   auto cmp = [&interestName](const Data& t){return t.getFullName() == interestName;};
@@ -712,7 +727,7 @@ TorrentManager::onRegisterFailed(const Name& prefix, const std::string& reason)
   LOG_ERROR << "ERROR: Failed to register prefix \""
             << prefix << "\" in local hub's daemon (" << reason << ")"
             << std::endl;
-  m_face->shutdown();
+  shutdown();
 }
 
 shared_ptr<Interest>

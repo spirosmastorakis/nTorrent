@@ -28,7 +28,7 @@
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/trivial.hpp>
 
-enum { SEVERITY_THRESHOLD = boost::log::trivial::warning };
+enum { SEVERITY_THRESHOLD = boost::log::trivial::trace };
 
 // register a global logger
 BOOST_LOG_INLINE_GLOBAL_LOGGER_DEFAULT(logger, boost::log::sources::severity_logger_mt<boost::log::trivial::severity_level>)

@@ -47,8 +47,9 @@ class SequentialDataFetcher : FetchingStrategyManager {
      * @param dataPath The path that the manager would look for already stored data packets and
      *                 will write new data packets
      */
-    SequentialDataFetcher(const ndn::Name& torrentFileName,
-                          const std::string& dataPath);
+    SequentialDataFetcher(const ndn::Name&   torrentFileName,
+                          const std::string& dataPath,
+                          bool               seed =  true);
 
     ~SequentialDataFetcher();
 
@@ -99,6 +100,7 @@ class SequentialDataFetcher : FetchingStrategyManager {
     std::string m_dataPath;
     ndn::Name m_torrentFileName;
     shared_ptr<TorrentManager> m_manager;
+    bool m_seedFlag;
 };
 
 } // namespace ntorrent

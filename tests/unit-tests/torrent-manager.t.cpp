@@ -48,7 +48,7 @@ public:
   TestTorrentManager(const ndn::Name&                 torrentFileName,
                      const std::string&               filePath,
                      std::shared_ptr<DummyClientFace> face)
-  : TorrentManager(torrentFileName, filePath, face)
+  : TorrentManager(torrentFileName, filePath, false, face)
   , m_face(face)
   {
     m_keyChain = make_shared<KeyChain>();
