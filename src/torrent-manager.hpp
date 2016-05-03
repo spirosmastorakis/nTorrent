@@ -22,6 +22,7 @@
 #define INCLUDED_TORRENT_FILE_MANAGER_H
 
 #include "file-manifest.hpp"
+#include "interest-queue.hpp"
 #include "torrent-file.hpp"
 #include "update-handler.hpp"
 
@@ -288,7 +289,9 @@ class TorrentManager : noncopyable {
     // Number of times to retry if a routable prefix fails to retrieve data
     MAX_NUM_OF_RETRIES = 5,
     // Number of Interests to be sent before sorting the stats table
-    SORTING_INTERVAL = 100
+    SORTING_INTERVAL = 100,
+    // Maximum window size used for sending new Interests out
+    WINDOW_SIZE = 50
   };
 
   void onDataReceived(const Data& data);
@@ -320,6 +323,10 @@ private:
   shared_ptr<Interest>
   createInterest(Name name);
 
+  void
+  sendInterest();
+
+
   // A flag to determine if upon completion we should continue seeding
   bool                                                                m_seedFlag;
   // Face used for network communication
@@ -336,6 +343,8 @@ private:
   shared_ptr<KeyChain>                                                m_keyChain;
 
   std::unordered_set<ndn::Name>                                       m_pendingInterests;
+
+  shared_ptr<InterestQueue>                                           m_interestQueue;
   // TODO(spyros) Fix and reintegrate update handler
   // // Update Handler instance
   // shared_ptr<UpdateHandler>                                           m_updateHandler;
@@ -357,6 +366,8 @@ TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
 , m_sortingCounter(0)
 , m_keyChain(new KeyChain())
 {
+  m_interestQueue = make_shared<InterestQueue>();
+
   if(face == nullptr) {
     m_face = make_shared<Face>();
   }

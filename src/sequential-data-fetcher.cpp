@@ -170,14 +170,6 @@ SequentialDataFetcher::onDataRetrievalFailure(const ndn::Interest& interest,
     this->downloadManifestFiles({ interest.getName() });
   }
   else if (nameType == IoUtil::DATA_PACKET) {
-    LOG_ERROR << "Torrent File Segment Downloading Failed: " << interest.getName();
-    this->downloadTorrentFile();
-  }
-  else if (nameType == IoUtil::FILE_MANIFEST) {
-    LOG_ERROR << "Manifest File Segment Downloading Failed: " << interest.getName();
-    this->downloadManifestFiles({ interest.getName() });
-  }
-  else if (nameType == IoUtil::DATA_PACKET) {
     LOG_ERROR << "Data Packet Downloading Failed: " << interest.getName();
     this->downloadPackets({ interest.getName() });
   }
