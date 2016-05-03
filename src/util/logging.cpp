@@ -42,11 +42,13 @@ namespace expr = boost::log::expressions;
 namespace ndn {
 namespace ntorrent {
 
+log::severity_level LoggingUtil::severity_threshold = log::info;
+
 void LoggingUtil::init()
 {
   logging::core::get()->set_filter
   (
-      logging::trivial::severity >= SEVERITY_THRESHOLD
+      logging::trivial::severity >= severity_threshold
   );
 
   logging::add_file_log

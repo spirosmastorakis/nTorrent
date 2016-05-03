@@ -28,8 +28,6 @@
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/trivial.hpp>
 
-enum { SEVERITY_THRESHOLD = boost::log::trivial::debug };
-
 // register a global logger
 BOOST_LOG_INLINE_GLOBAL_LOGGER_DEFAULT(logger, boost::log::sources::severity_logger_mt<boost::log::trivial::severity_level>)
 
@@ -47,7 +45,11 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_DEFAULT(logger, boost::log::sources::severity_log
 namespace ndn {
 namespace ntorrent {
 
+namespace log = boost::log::trivial;
+
 struct LoggingUtil {
+  static log::severity_level severity_threshold;
+
   static void init();
   // Initialize the log for the application. THis method must be called in the main function in
   // the application before any logging may be performed.

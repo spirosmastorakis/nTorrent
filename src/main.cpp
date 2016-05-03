@@ -27,6 +27,7 @@
 #include <iterator>
 #include <stdexcept>
 #include <algorithm>
+#include <unordered_map>
 
 #include <boost/program_options.hpp>
 #include <boost/program_options/errors.hpp>
@@ -61,9 +62,6 @@ const char * SharedConstants::commonPrefix = "/ndn";
 int main(int argc, char *argv[])
 {
   try {
-   LoggingUtil::init();
-   logging::add_common_attributes();
-
     po::options_description desc("Allowed options");
     desc.add_options()
     // TODO(msweatt) Consider  adding  flagged args for other parameters
@@ -71,6 +69,7 @@ int main(int argc, char *argv[])
       ("generate,g" , "-g <data directory> <output-path>? <names-per-segment>? <names-per-manifest-segment>? <data-packet-size>?")
       ("seed,s", "After download completes, continue to seed")
       ("dump,d", "-d <file> Dump the contents of the Data stored at the <file>.")
+      ("log-level", po::value<std::string>(), "trace | debug | info | warming | error | fatal")
       ("args", po::value<std::vector<std::string> >(), "For arguments you want to specify without flags")
     ;
     po::positional_options_description p;
@@ -85,6 +84,27 @@ int main(int argc, char *argv[])
         std::cout << desc << std::endl;
         return 1;
     }
+    if (vm.count("log-level")) {
+    std::unordered_map<std::string, log::severity_level> supported_levels = {
+        {"trace"   , log::severity_level::trace},
+        { "debug"  , log::severity_level::debug},
+        { "info"   , log::severity_level::info},
+        { "warning", log::severity_level::warning},
+        { "error"  , log::severity_level::error},
+        { "fatal"  , log::severity_level::fatal}
+      };
+      auto log_str = vm["log-level"].as<std::string>();
+      if (supported_levels.count(log_str)) {
+        LoggingUtil::severity_threshold  = supported_levels[log_str];
+      }
+      else {
+        throw ndn::Error("Unsupported log level: " + log_str);
+      }
+    }
+    // setup log
+    LoggingUtil::init();
+    logging::add_common_attributes();
+
     if (vm.count("args")) {
       auto args = vm["args"].as<std::vector<std::string>>();
       // if generate mode
