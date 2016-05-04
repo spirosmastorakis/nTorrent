@@ -252,7 +252,7 @@ TorrentFile::generate(const std::string& directoryPath,
   Name directoryPathName(directoryPath);
   fs::recursive_directory_iterator directoryPtr(fs::system_complete(directoryPath).string());
 
-  Name commonPrefix("/NTORRENT" +
+  Name commonPrefix("/ndn/multicast/NTORRENT" +
                     directoryPathName.getSubName(directoryPathName.size() - 1).toUri());
 
   Name torrentName(commonPrefix.toUri() + "/torrent-file");
@@ -265,7 +265,7 @@ TorrentFile::generate(const std::string& directoryPath,
   }
   size_t manifestFileCounter = 0u;
   for (const auto& fileName : fileNames) {
-    Name manifestPrefix("/NTORRENT" +
+    Name manifestPrefix("/ndn/multicast/NTORRENT" +
                         directoryPathName.getSubName(directoryPathName.size() - 1).toUri());
     std::pair<std::vector<FileManifest>, std::vector<Data>> currentManifestPair =
                                                     FileManifest::generate(fileName,

@@ -156,9 +156,9 @@ BOOST_AUTO_TEST_CASE(CheckInitializeComplete)
        size_t         d_subManifestSize;
        size_t         d_dataPacketSize;
    } DATA [] = {
-    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
-     {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=b88c054e87bcbb744726f7eaf79f95459b4fddce2caeb952f263a5ccbbfc9a7c", 128,  128, 128},
-     // {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=76df604f23bdf257d16de588f2941df261951552a5f4435a315f59c3b018a851",   1,    1, 128},
+    {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981", 1024, 1024, 1024},
+     {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=5351d424c7893158da35707258635d885725be0aa34321cf2e557afc2b785a76", 128,  128, 128},
+     {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=24ea5e5e3af6a548cc54c0d5b3573ecb18e247f1567a0d586c1d7c131b75181d",   1,  128, 128},
    };
    enum { NUM_DATA = sizeof DATA / sizeof *DATA };
    for (int i = 0; i < NUM_DATA; ++i) {
@@ -230,7 +230,7 @@ BOOST_AUTO_TEST_CASE(CheckInitializeComplete)
 
 BOOST_AUTO_TEST_CASE(CheckInitializeEmpty)
 {
-  TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981",
                              "tests/testdata/", face);
 
   manager.Initialize();
@@ -253,9 +253,9 @@ BOOST_AUTO_TEST_CASE(CheckInitializeNoManifests)
        size_t         d_subManifestSize;
        size_t         d_dataPacketSize;
    } DATA [] = {
-    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
-     {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=b88c054e87bcbb744726f7eaf79f95459b4fddce2caeb952f263a5ccbbfc9a7c", 128,  128, 128},
-     // {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=76df604f23bdf257d16de588f2941df261951552a5f4435a315f59c3b018a851",   1,    1, 128},
+     {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981", 1024, 1024, 1024},
+     {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=5351d424c7893158da35707258635d885725be0aa34321cf2e557afc2b785a76", 128,  128, 128},
+     {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=24ea5e5e3af6a548cc54c0d5b3573ecb18e247f1567a0d586c1d7c131b75181d",   1,  128, 128},
    };
    enum { NUM_DATA = sizeof DATA / sizeof *DATA };
    for (int i = 0; i < NUM_DATA; ++i) {
@@ -316,9 +316,9 @@ BOOST_AUTO_TEST_CASE(CheckInitializeMissingManifests)
        size_t         d_subManifestSize;
        size_t         d_dataPacketSize;
    } DATA [] = {
-    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
-     {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=b88c054e87bcbb744726f7eaf79f95459b4fddce2caeb952f263a5ccbbfc9a7c", 128,  128, 128},
-     // {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=76df604f23bdf257d16de588f2941df261951552a5f4435a315f59c3b018a851",   1,    1, 128},
+    {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981", 1024, 1024, 1024},
+     {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=5351d424c7893158da35707258635d885725be0aa34321cf2e557afc2b785a76", 128,  128, 128},
+     {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=24ea5e5e3af6a548cc54c0d5b3573ecb18e247f1567a0d586c1d7c131b75181d",   1,  128, 128},
    };
    enum { NUM_DATA = sizeof DATA / sizeof *DATA };
    for (int i = 0; i < NUM_DATA; ++i) {
@@ -402,7 +402,6 @@ BOOST_AUTO_TEST_CASE(TestDownloadingTorrentFile)
   // get torrent files and manifests
   {
     auto temp = TorrentFile::generate("tests/testdata/foo", 1, 10, 10, false);
-
     torrentSegments = temp.first;
     auto temp1      = temp.second;
     temp1.pop_back(); // remove the manifests for the last file
@@ -412,8 +411,7 @@ BOOST_AUTO_TEST_CASE(TestDownloadingTorrentFile)
       }
     }
   }
-
-  TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=946b92641d2b87bf4f5913930be20e3789ff5fb5d72739614f93f677d90fbd9d",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=521110d7a60e317e1f36029a414f0d98318f26553720ed50a26479fe4bf982b7",
                              filePath, face);
 
   manager.Initialize();
@@ -466,7 +464,7 @@ BOOST_AUTO_TEST_CASE(TestDownloadingFileManifests)
     }
   }
 
-  TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=946b92641d2b87bf4f5913930be20e3789ff5fb5d72739614f93f677d90fbd9d",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=521110d7a60e317e1f36029a414f0d98318f26553720ed50a26479fe4bf982b7",
                              filePath, face);
 
   manager.Initialize();
@@ -528,7 +526,7 @@ BOOST_AUTO_TEST_CASE(TestDownloadingFileManifests)
 BOOST_AUTO_TEST_CASE(TestDownloadingDataPackets)
 {
   std::string filePath = ".appdata/foo/";
-  TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=946b92641d2b87bf4f5913930be20e3789ff5fb5d72739614f93f677d90fbd9d",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=521110d7a60e317e1f36029a414f0d98318f26553720ed50a26479fe4bf982b7",
                              filePath, face);
 
   manager.Initialize();
@@ -575,7 +573,7 @@ BOOST_AUTO_TEST_CASE(TestDownloadingDataPackets)
 BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload1)
 {
   std::string filePath = ".appdata/foo/";
-  TestTorrentManager manager("NTORRENT/test/torrent-file/sha256digest",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/test/torrent-file/sha256digest",
                              filePath, face);
 
   manager.Initialize();
@@ -583,22 +581,22 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload1)
   advanceClocks(time::milliseconds(1), 10);
   manager.sendRoutablePrefixResponse();
 
-  TorrentFile t1(Name("NTORRENT/test/torrent-file/sha256digest"),
-                 Name("NTORRENT/test/torrent-file/1/sha256digest"), Name("/test"),
+  TorrentFile t1(Name("/ndn/multicast/NTORRENT/test/torrent-file/sha256digest"),
+                 Name("/ndn/multicast/NTORRENT/test/torrent-file/1/sha256digest"), Name("/test"),
                  { Name("/manifest1") });
   manager.pushTorrentSegment(t1);
 
-  TorrentFile t2(Name("NTORRENT/test/torrent-file/1/sha256digest"),
-                 Name("NTORRENT/test/torrent-file/2/sha256digest"), Name("/test"),
+  TorrentFile t2(Name("/ndn/multicast/NTORRENT/test/torrent-file/1/sha256digest"),
+                 Name("/ndn/multicast/NTORRENT/test/torrent-file/2/sha256digest"), Name("/test"),
                  { Name("/manifest2"), Name("/manifest3") });
   manager.pushTorrentSegment(t2);
 
-  TorrentFile t3(Name("NTORRENT/test/torrent-file/3/sha256digest"),
-                 Name("NTORRENT/test/torrent-file/4/sha256digest"), Name("/test"),
+  TorrentFile t3(Name("/ndn/multicast/NTORRENT/test/torrent-file/3/sha256digest"),
+                 Name("/ndn/multicast/NTORRENT/test/torrent-file/4/sha256digest"), Name("/test"),
                  { Name("/manifest4"), Name("/manifest5") });
   manager.pushTorrentSegment(t3);
 
-  TorrentFile t4(Name("NTORRENT/test/torrent-file/4/sha256digest"), Name("/test"), {});
+  TorrentFile t4(Name("/ndn/multicast/NTORRENT/test/torrent-file/4/sha256digest"), Name("/test"), {});
   manager.pushTorrentSegment(t4);
 
   BOOST_CHECK(!(manager.findTorrentFileSegmentToDownload()));
@@ -621,7 +619,7 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload1)
 BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload2)
 {
   std::string filePath = ".appdata/foo/";
-  TestTorrentManager manager("NTORRENT/test/torrent-file/0/sha256digest",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/test/torrent-file/0/sha256digest",
                              filePath, face);
 
   manager.Initialize();
@@ -630,7 +628,7 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload2)
   manager.sendRoutablePrefixResponse();
 
   BOOST_CHECK_EQUAL(manager.findTorrentFileSegmentToDownload()->toUri(),
-                    "/NTORRENT/test/torrent-file/0/sha256digest");
+                    "/ndn/multicast/NTORRENT/test/torrent-file/0/sha256digest");
 
   fs::remove_all(filePath);
   fs::remove_all(".appdata");
@@ -639,7 +637,7 @@ BOOST_AUTO_TEST_CASE(TestFindTorrentFileSegmentToDownload2)
 BOOST_AUTO_TEST_CASE(TestFindManifestSegmentToDownload1)
 {
   std::string filePath = ".appdata/foo/";
-  TestTorrentManager manager("NTORRENT/test/torrent-file/sha256digest",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/test/torrent-file/sha256digest",
                              filePath, face);
 
   manager.Initialize();
@@ -647,54 +645,54 @@ BOOST_AUTO_TEST_CASE(TestFindManifestSegmentToDownload1)
   advanceClocks(time::milliseconds(1), 10);
   manager.sendRoutablePrefixResponse();
 
-  Name n1(Name("NTORRENT/test/file0"));
+  Name n1(Name("/ndn/multicast/NTORRENT/test/file0"));
   n1.appendSequenceNumber(0);
 
-  Name n2(Name("NTORRENT/test/file0"));
+  Name n2(Name("/ndn/multicast/NTORRENT/test/file0"));
   n2.appendSequenceNumber(1);
 
-  Name n3(Name("NTORRENT/test/file0"));
+  Name n3(Name("/ndn/multicast/NTORRENT/test/file0"));
   n3.appendSequenceNumber(2);
 
-  Name n4(Name("NTORRENT/test/file0"));
+  Name n4(Name("/ndn/multicast/NTORRENT/test/file0"));
   n4.appendSequenceNumber(3);
 
-  Name n5(Name("NTORRENT/test/file0"));
+  Name n5(Name("/ndn/multicast/NTORRENT/test/file0"));
   n5.appendSequenceNumber(4);
 
-  Name n6(Name("NTORRENT/test1/file0"));
+  Name n6(Name("/ndn/multicast/NTORRENT/test1/file0"));
   n6.appendSequenceNumber(0);
 
-  Name n7(Name("NTORRENT/test1/file0"));
+  Name n7(Name("/ndn/multicast/NTORRENT/test1/file0"));
   n7.appendSequenceNumber(1);
 
   // In theory, this may not be correct, but here let's suck it up for the sake
   // of testing the function correctness
-  Name n8(Name("NTORRENT/test1/file2"));
+  Name n8(Name("/ndn/multicast/NTORRENT/test1/file2"));
   n8.appendSequenceNumber(0);
 
-  Name n9(Name("NTORRENT/test1/file2"));
+  Name n9(Name("/ndn/multicast/NTORRENT/test1/file2"));
   n9.appendSequenceNumber(1);
 
-  FileManifest f1(n1, 50, Name("NTORRENT/test"), {}, make_shared<Name>(n2));
+  FileManifest f1(n1, 50, Name("/ndn/multicast/NTORRENT/test"), {}, make_shared<Name>(n2));
   manager.pushFileManifestSegment(f1);
 
-  FileManifest f2(n2, 50, Name("NTORRENT/test"), {}, make_shared<Name>(n3));
+  FileManifest f2(n2, 50, Name("/ndn/multicast/NTORRENT/test"), {}, make_shared<Name>(n3));
   manager.pushFileManifestSegment(f2);
 
-  FileManifest f3(n3, 50, Name("NTORRENT/test"), {}, make_shared<Name>(n4));
+  FileManifest f3(n3, 50, Name("/ndn/multicast/NTORRENT/test"), {}, make_shared<Name>(n4));
   manager.pushFileManifestSegment(f3);
 
-  FileManifest f4(n4, 50, Name("NTORRENT/test"), {}, make_shared<Name>(n5));
+  FileManifest f4(n4, 50, Name("/ndn/multicast/NTORRENT/test"), {}, make_shared<Name>(n5));
   manager.pushFileManifestSegment(f4);
 
-  FileManifest f5(n6, 50, Name("NTORRENT/test2"), {}, make_shared<Name>(n7));
+  FileManifest f5(n6, 50, Name("/ndn/multicast/NTORRENT/test2"), {}, make_shared<Name>(n7));
   manager.pushFileManifestSegment(f5);
 
-  FileManifest f6(n7, 50, Name("NTORRENT/test2"), {}, {});
+  FileManifest f6(n7, 50, Name("/ndn/multicast/NTORRENT/test2"), {}, {});
   manager.pushFileManifestSegment(f6);
 
-  FileManifest f7(n8, 50, Name("NTORRENT/test3"), {}, make_shared<Name>(n9));
+  FileManifest f7(n8, 50, Name("/ndn/multicast/NTORRENT/test3"), {}, make_shared<Name>(n9));
   manager.pushFileManifestSegment(f7);
 
   BOOST_CHECK_EQUAL(manager.findManifestSegmentToDownload(Name(n2.toUri() + "/sha256digest"))->toUri(), n5.toUri());
@@ -703,7 +701,7 @@ BOOST_AUTO_TEST_CASE(TestFindManifestSegmentToDownload1)
                                                                Name(n5.toUri() + "/sha256digest").toUri());
   BOOST_CHECK(!(manager.findManifestSegmentToDownload(Name(n7.toUri() + "/sha256digest"))));
 
-  Name n10(Name("NTORRENT/test1/file1"));
+  Name n10(Name("/ndn/multicast/NTORRENT/test1/file1"));
   n10.appendSequenceNumber(1);
   n10 = Name(n10.toUri() + "/sha256digest");
 
@@ -751,7 +749,7 @@ BOOST_AUTO_TEST_CASE(TestFindManifestSegmentToDownload2)
     io::save(m, filename.string());
   }
   // Initialize manager
-  TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=a8a2e98cd943d895b8c4b12a208343bcf9344ce85a6376dc6f5754fe8f4a573e",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=6114e56874fc01bf8f9c40fa652741a895eb922372f1baf039ccea64dacd2152",
                              filePath,
                              face);
 
@@ -854,7 +852,7 @@ BOOST_AUTO_TEST_CASE(TestDataAlreadyDownloaded)
     io::save(m, filename.string());
   }
   // Initialize manager
-  TestTorrentManager manager("/NTORRENT/foo/torrent-file/sha256digest=a8a2e98cd943d895b8c4b12a208343bcf9344ce85a6376dc6f5754fe8f4a573e",
+  TestTorrentManager manager("/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=6114e56874fc01bf8f9c40fa652741a895eb922372f1baf039ccea64dacd2152",
                              filePath,
                              face);
 
@@ -874,14 +872,14 @@ BOOST_AUTO_TEST_CASE(TestDataAlreadyDownloaded)
   std::vector<bool> v3 = {true, false, false, false, false, false};
   manager.setFileState(manifests[2].getFullName(), make_shared<fs::fstream>(), v3);
 
-  Name p1("NTORRENT/foo/bar1.txt");
+  Name p1("/ndn/multicast/NTORRENT/foo/bar1.txt");
   p1.appendSequenceNumber(0);
   p1.appendSequenceNumber(0);
   p1 = Name(p1.toUri() + "/sha256digest");
 
   BOOST_CHECK(!(manager.hasDataPacket(p1)));
 
-  Name p2("NTORRENT/foo/bar.txt");
+  Name p2("/ndn/multicast/NTORRENT/foo/bar.txt");
   p2.appendSequenceNumber(0);
   p2.appendSequenceNumber(0);
   p2 = Name(p2.toUri() + "/sha256digest");
@@ -898,9 +896,9 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
        size_t         d_subManifestSize;
        size_t         d_dataPacketSize;
    } DATA [] = {
-    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
-     {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=b88c054e87bcbb744726f7eaf79f95459b4fddce2caeb952f263a5ccbbfc9a7c", 128,  128, 128},
-     // {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=76df604f23bdf257d16de588f2941df261951552a5f4435a315f59c3b018a851",   1,    1, 128},
+      {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981", 1024, 1024, 1024},
+      // {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=5351d424c7893158da35707258635d885725be0aa34321cf2e557afc2b785a76", 128,  128, 128},
+      // {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=24ea5e5e3af6a548cc54c0d5b3573ecb18e247f1567a0d586c1d7c131b75181d",   1,  128, 128},
    };
    enum { NUM_DATA = sizeof DATA / sizeof *DATA };
    for (int i = 0; i < NUM_DATA; ++i) {
@@ -910,56 +908,56 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
      auto dataPacketSize     = DATA[i].d_dataPacketSize;
      auto subManifestSize    = DATA[i].d_subManifestSize;
 
-    vector<FileManifest> manifests;
-    vector<TorrentFile> torrentSegments;
-    std::string filePath = "tests/testdata/";
-    std::vector<vector<Data>> fileData;
-    // get torrent files and manifests
-    {
+     vector<FileManifest> manifests;
+     vector<TorrentFile> torrentSegments;
+     std::string filePath = "tests/testdata/";
+     std::vector<vector<Data>> fileData;
+     // get torrent files and manifests
+     {
       auto temp = TorrentFile::generate(directoryPath,
                                         namesPerSegment,
                                         subManifestSize,
                                         dataPacketSize,
-                                        false);
+                                        true);
       torrentSegments = temp.first;
       auto temp1      = temp.second;
       for (const auto& ms : temp1) {
         manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
         fileData.push_back(ms.second);
       }
-    }
-    // write the torrent segments  and manifests to disk
-    std::string dirPath = ".appdata/foo/";
-    boost::filesystem::create_directories(dirPath);
-    std::string torrentPath = dirPath + "torrent_files/";
-    boost::filesystem::create_directory(torrentPath);
-    auto fileNum = 0;
-    for (const auto& t : torrentSegments) {
+     }
+     // write the torrent segments  and manifests to disk
+     std::string dirPath = ".appdata/foo/";
+     boost::filesystem::create_directories(dirPath);
+     std::string torrentPath = dirPath + "torrent_files/";
+     boost::filesystem::create_directory(torrentPath);
+     auto fileNum = 0;
+     for (const auto& t : torrentSegments) {
       fileNum++;
       auto filename = torrentPath + to_string(fileNum);
       io::save(t, filename);
-    }
-    auto manifestPath = dirPath + "manifests/";
-    boost::filesystem::create_directory(manifestPath);
-    for (const auto& m : manifests) {
+     }
+     auto manifestPath = dirPath + "manifests/";
+     boost::filesystem::create_directory(manifestPath);
+     for (const auto& m : manifests) {
       fs::path filename = manifestPath + m.file_name() + "/" + to_string(m.submanifest_number());
       boost::filesystem::create_directories(filename.parent_path());
       io::save(m, filename.string());
-    }
-    // Initialize and verify
-    TestTorrentManager manager(initialSegmentName,
-                               filePath,
-                               face);
+     }
+     // Initialize and verify
+     TestTorrentManager manager(initialSegmentName,
+                                filePath,
+                                face);
 
-    manager.Initialize();
+     manager.Initialize();
 
-    advanceClocks(time::milliseconds(1), 10);
-    manager.sendRoutablePrefixResponse();
+     advanceClocks(time::milliseconds(1), 10);
+     manager.sendRoutablePrefixResponse();
 
-    size_t nData = 0;
-    BOOST_CHECK_EQUAL(0, face->sentData.size());
-    // request all the torrent segments
-    for (const auto& t : torrentSegments) {
+     size_t nData = 0;
+     BOOST_CHECK_EQUAL(0, face->sentData.size());
+     // request all the torrent segments
+     for (const auto& t : torrentSegments) {
       Interest interest(t.getFullName(), time::milliseconds(50));
       face->expressInterest(interest,
                             [&t](const Interest& i, const Data& d) {
@@ -979,54 +977,54 @@ BOOST_AUTO_TEST_CASE(CheckSeedComplete)
       // check that one piece of data is sent, and it is what was expected
       BOOST_CHECK_EQUAL(++nData, face->sentData.size());
       face->receive(face->sentData[nData - 1]);
-    }
-    // request all the file manifests
-    for (const auto& m : manifests) {
-      Interest interest(m.getFullName(), time::milliseconds(50));
-      face->expressInterest(interest,
-                            [&m](const Interest& i, const Data& d) {
-                              FileManifest m1(d.wireEncode());
-                              BOOST_CHECK(m == d);
-                              BOOST_CHECK(m1 == m);
-                            },
-                             bind([] {
-                               BOOST_FAIL("Unexpected Nack");
-                             }),
-                             bind([] {
-                               BOOST_FAIL("Unexpected timeout");
-                             }));
-      advanceClocks(time::milliseconds(1), 40);
-      face->receive(interest);
-      manager.processEvents(time::milliseconds(-1));
-      // check that one piece of data is sent, and it is what was expected
-      BOOST_CHECK_EQUAL(++nData, face->sentData.size());
-      face->receive(face->sentData[nData - 1]);
-    }
-    // request all the data packets
-    for (const auto& file : fileData) {
-      for (const auto& data : file) {
-      Interest interest(data.getFullName(), time::milliseconds(50));
-      face->expressInterest(interest,
-                            [&data](const Interest& i, const Data& d) {
-                              BOOST_CHECK(data == d);
-                            },
-                             bind([] {
-                               BOOST_FAIL("Unexpected Nack");
-                             }),
-                             bind([] {
-                               BOOST_FAIL("Unexpected timeout");
-                             }));
-        advanceClocks(time::milliseconds(1), 40);
-        face->receive(interest);
-        manager.processEvents(time::milliseconds(-1));
-        // check that one piece of data is sent, and it is what was expected
-        BOOST_CHECK_EQUAL(++nData, face->sentData.size());
-        face->receive(face->sentData[nData - 1]);
-      }
-    }
-    // clean up tests
-    face->sentData.clear();
-    fs::remove_all(".appdata/");
+     }
+     // request all the file manifests
+     for (const auto& m : manifests) {
+       Interest interest(m.getFullName(), time::milliseconds(50));
+       face->expressInterest(interest,
+                             [&m](const Interest& i, const Data& d) {
+                               FileManifest m1(d.wireEncode());
+                               BOOST_CHECK(m == d);
+                               BOOST_CHECK(m1 == m);
+                             },
+                              bind([] {
+                                BOOST_FAIL("Unexpected Nack");
+                              }),
+                              bind([] {
+                                BOOST_FAIL("Unexpected timeout");
+                              }));
+       advanceClocks(time::milliseconds(1), 40);
+       face->receive(interest);
+       manager.processEvents(time::milliseconds(-1));
+       // check that one piece of data is sent, and it is what was expected
+       BOOST_CHECK_EQUAL(++nData, face->sentData.size());
+       face->receive(face->sentData[nData - 1]);
+     }
+     // request all the data packets
+     for (const auto& file : fileData) {
+       for (const auto& data : file) {
+       Interest interest(data.getFullName(), time::milliseconds(50));
+       face->expressInterest(interest,
+                             [&data](const Interest& i, const Data& d) {
+                               BOOST_CHECK(data == d);
+                             },
+                              bind([] {
+                                BOOST_FAIL("Unexpected Nack");
+                              }),
+                              bind([] {
+                                BOOST_FAIL("Unexpected timeout");
+                              }));
+         advanceClocks(time::milliseconds(1), 40);
+         face->receive(interest);
+         manager.processEvents(time::milliseconds(-1));
+         // check that one piece of data is sent, and it is what was expected
+         BOOST_CHECK_EQUAL(++nData, face->sentData.size());
+         face->receive(face->sentData[nData - 1]);
+       }
+     }
+     // clean up tests
+     face->sentData.clear();
+     fs::remove_all(".appdata");
   }
 }
 
@@ -1038,7 +1036,7 @@ BOOST_AUTO_TEST_CASE(CheckSeedRandom)
   std::vector<Data> data;
   std::string filePath = "tests/testdata/";
   std::string dirPath = ".appdata/foo/";
-  Name initialSegmentName = "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253";
+  Name initialSegmentName = "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981";
   // get torrent files and manifests
   {
     auto temp = TorrentFile::generate("tests/testdata/foo",
@@ -1123,8 +1121,8 @@ BOOST_AUTO_TEST_CASE(CheckWriteDataComplete)
       size_t         d_subManifestSize;
       size_t         d_dataPacketSize;
   } DATA [] = {
-    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
-    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=b88c054e87bcbb744726f7eaf79f95459b4fddce2caeb952f263a5ccbbfc9a7c", 128,  128, 128},
+    {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981", 1024, 1024, 1024},
+    {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=5351d424c7893158da35707258635d885725be0aa34321cf2e557afc2b785a76", 128,  128, 128},
   };
   enum { NUM_DATA = sizeof DATA / sizeof *DATA };
   for (int i = 0; i < NUM_DATA; ++i) {
@@ -1238,8 +1236,8 @@ BOOST_AUTO_TEST_CASE(CheckWriteTorrentComplete)
       size_t         d_subManifestSize;
       size_t         d_dataPacketSize;
   } DATA [] = {
-    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
-    {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=96d900d6788465f9a7b00191581b004c910d74b3762d141ec0e82173731bc9f4",    1,    1, 1024},
+    {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981", 1024, 1024, 1024},
+    // {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=96d900d6788465f9a7b00191581b004c910d74b3762d141ec0e82173731bc9f4",    1,    1, 1024},
   };
   enum { NUM_DATA = sizeof DATA / sizeof *DATA };
   for (int i = 0; i < NUM_DATA; ++i) {
@@ -1324,8 +1322,8 @@ BOOST_AUTO_TEST_CASE(CheckWriteManifestComplete)
      size_t         d_subManifestSize;
      size_t         d_dataPacketSize;
   } DATA [] = {
-   {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253", 1024, 1024, 1024},
-   {"tests/testdata/foo", "/NTORRENT/foo/torrent-file/sha256digest=02c737fd4c6e7de4b4825b089f39700c2dfa8fd2bb2b91f09201e357c4463253",     128,  128, 1024},
+   {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981", 1024, 1024, 1024},
+   {"tests/testdata/foo", "/ndn/multicast/NTORRENT/foo/torrent-file/sha256digest=9e0410fa477309b40a4ef9cb2bebe70ed2e9fa2defcb584979d768b3f6ced981",     128,  128, 1024},
   };
   enum { NUM_DATA = sizeof DATA / sizeof *DATA };
   for (int i = 0; i < NUM_DATA; ++i) {

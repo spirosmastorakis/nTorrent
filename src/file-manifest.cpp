@@ -65,7 +65,7 @@ get_name_of_manifest(const std::string& filePath, const Name& manifestPrefix)
                                               manifestPrefix.toUri() + " and "     +
                                               full_path.toUri()));
   }
-  ndn::Name manifestName = "/NTORRENT/";
+  ndn::Name manifestName = "/ndn/multicast/NTORRENT/";
   // Rebuild the name to be the suffix from the matching component
   for (auto it = (name_component_iter.base() - 1); full_path.end() != it; ++it) {
     manifestName.append(*it);
@@ -204,7 +204,6 @@ FileManifest::push_back(const Name& name)
 {
   BOOST_ASSERT(name != m_catalogPrefix);
   BOOST_ASSERT(m_catalogPrefix.isPrefixOf(name));
-  // TODO(msweatt) Change this to use the copy constructor once bug fixed in Name()
   m_catalog.push_back(name.toUri());
 }
 

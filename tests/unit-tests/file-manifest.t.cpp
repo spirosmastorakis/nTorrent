@@ -334,21 +334,21 @@ BOOST_AUTO_TEST_CASE(CheckGenerateFileManifest)
       bool           d_shouldThrow;
   } DATA [] = {
     // Affirmative tests
-    {1            , TEST_FILE_LEN, "tests/testdata/foo/bar.txt" , "/NTORRENT/foo/", true, false },
-    {10           , 10           , "tests/testdata/foo/bar.txt" , "/NTORRENT/foo/", true, false },
-    {10           , 1            , "tests/testdata/foo/bar.txt" , "/NTORRENT/foo/", true, false },
-    {1            , 10           , "tests/testdata/foo/bar.txt" , "/NTORRENT/foo/", true, false },
-    {1            , 1            , "tests/testdata/foo/bar.txt" , "/NTORRENT/foo/", true, false },
-    {1024         , 1            , "tests/testdata/foo/bar1.txt", "/NTORRENT/foo/", true, false },
-    {1024         , 100          , "tests/testdata/foo/bar1.txt", "/NTORRENT/foo/", true, false },
-    {TEST_FILE_LEN, 1            , "tests/testdata/foo/bar.txt" , "/NTORRENT/foo/", true, false },
+    {1            , TEST_FILE_LEN, "tests/testdata/foo/bar.txt" , "/ndn/multicast/NTORRENT/foo/", true, false },
+    {10           , 10           , "tests/testdata/foo/bar.txt" , "/ndn/multicast/NTORRENT/foo/", true, false },
+    {10           , 1            , "tests/testdata/foo/bar.txt" , "/ndn/multicast/NTORRENT/foo/", true, false },
+    {1            , 10           , "tests/testdata/foo/bar.txt" , "/ndn/multicast/NTORRENT/foo/", true, false },
+    {1            , 1            , "tests/testdata/foo/bar.txt" , "/ndn/multicast/NTORRENT/foo/", true, false },
+    {1024         , 1            , "tests/testdata/foo/bar1.txt", "/ndn/multicast/NTORRENT/foo/", true, false },
+    {1024         , 100          , "tests/testdata/foo/bar1.txt", "/ndn/multicast/NTORRENT/foo/", true, false },
+    {TEST_FILE_LEN, 1            , "tests/testdata/foo/bar.txt" , "/ndn/multicast/NTORRENT/foo/", true, false },
     // Negative tests
     //   non-existent file
-    {128          , 128          , "tests/testdata/foo/fake.txt", "/NTORRENT/foo/", false, true },
+    {128          , 128          , "tests/testdata/foo/fake.txt", "/ndn/multicast/NTORRENT/foo/", false, true },
     // prefix mismatch
-    {128          , 128          , "tests/testdata/foo/bar.txt", "/NTORRENT/bar/",  false, true },
+    {128          , 128          , "tests/testdata/foo/bar.txt", "/ndn/multicast/NTORRENT/bar/",  false, true },
     // scaling test
-    // {10240         , 5120 ,         "tests/testdata/foo/huge_file", "/NTORRENT/foo/", false, false },
+    // {10240         , 5120 ,         "tests/testdata/foo/huge_file", "/ndn/multicast/NTORRENT/foo/", false, false },
     // assertion failures (tests not supported on platforms)
     // {0            , 128          , "tests/testdata/foo/bar.txt", "/NTORRENT/bar/", true },
     // {128          , 0            , "tests/testdata/foo/bar.txt", "/NTORRENT/bar/", true },

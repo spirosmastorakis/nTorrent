@@ -127,35 +127,35 @@ BOOST_AUTO_TEST_SUITE(TestTorrentFile)
 BOOST_AUTO_TEST_CASE(CheckGettersSetters)
 {
 
-  TorrentFile file("/NTORRENT/linux15.01/torrent-file/AB2CDA",
-                   "/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
-                   "/NTORRENT/linux15.01",
-                   {"/NTORRENT/linux15.01/file0/1A2B3C4D",
-                   "/NTORRENT/linux15.01/file1/2A3B4C5E"});
+  TorrentFile file("/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA",
+                   "/ndn/multicast/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
+                   "/ndn/multicast/NTORRENT/linux15.01",
+                   {"/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D",
+                   "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E"});
 
-  BOOST_CHECK_EQUAL(file.getName(), "/NTORRENT/linux15.01/torrent-file/AB2CDA");
+  BOOST_CHECK_EQUAL(file.getName(), "/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA");
   BOOST_CHECK_EQUAL(file.getCatalog().size(), 2);
   BOOST_CHECK_EQUAL(*(file.getTorrentFilePtr()),
-                   "/NTORRENT/linux15.01/torrent-file/segment2/AE321C");
-  BOOST_CHECK_EQUAL(file.getCatalog()[0], "/NTORRENT/linux15.01/file0/1A2B3C4D");
-  BOOST_CHECK_EQUAL(file.getCatalog()[1], "/NTORRENT/linux15.01/file1/2A3B4C5E");
+                   "/ndn/multicast/NTORRENT/linux15.01/torrent-file/segment2/AE321C");
+  BOOST_CHECK_EQUAL(file.getCatalog()[0], "/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D");
+  BOOST_CHECK_EQUAL(file.getCatalog()[1], "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E");
 
-  TorrentFile file2("/NTORRENT/linux15.01/torrent-file/AB2CDA",
-                    "/NTORRENT/linux15.01",
-                    {"/NTORRENT/linux15.01/file0/1A2B3C4D"});
+  TorrentFile file2("/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA",
+                    "/ndn/multicast/NTORRENT/linux15.01",
+                    {"/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D"});
 
-  BOOST_CHECK_EQUAL(file2.getName(), "/NTORRENT/linux15.01/torrent-file/AB2CDA");
+  BOOST_CHECK_EQUAL(file2.getName(), "/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA");
   BOOST_CHECK(!file2.getTorrentFilePtr());
   BOOST_CHECK_EQUAL(file2.getCatalog().size(), 1);
 }
 
 BOOST_AUTO_TEST_CASE(CheckEncodeDecode)
 {
-  TorrentFile file("/NTORRENT/linux15.01/torrent-file/AB2CDA",
-                   "/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
-                   "/NTORRENT/linux15.01",
-                   {"/NTORRENT/linux15.01/file0/1A2B3C4D",
-                   "/NTORRENT/linux15.01/file1/2A3B4C5E"});
+  TorrentFile file("/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA",
+                   "/ndn/multicast/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
+                   "/ndn/multicast/NTORRENT/linux15.01",
+                   {"/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D",
+                   "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E"});
 
   file.finalize();
   KeyChain keyChain;
@@ -166,21 +166,21 @@ BOOST_AUTO_TEST_CASE(CheckEncodeDecode)
   TorrentFile file2;
   file2.wireDecode(wire);
 
-  BOOST_CHECK_EQUAL(file2.getName(), "/NTORRENT/linux15.01/torrent-file/AB2CDA");
+  BOOST_CHECK_EQUAL(file2.getName(), "/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA");
   BOOST_CHECK_EQUAL(*(file2.getTorrentFilePtr()),
-                   "/NTORRENT/linux15.01/torrent-file/segment2/AE321C");
+                   "/ndn/multicast/NTORRENT/linux15.01/torrent-file/segment2/AE321C");
   BOOST_CHECK_EQUAL(file2.getCatalog().size(), 2);
-  BOOST_CHECK_EQUAL(file2.getCatalog()[0], "/NTORRENT/linux15.01/file0/1A2B3C4D");
-  BOOST_CHECK_EQUAL(file2.getCatalog()[1], "/NTORRENT/linux15.01/file1/2A3B4C5E");
-  BOOST_CHECK_EQUAL(file2.getCommonPrefix(), "/NTORRENT/linux15.01");
+  BOOST_CHECK_EQUAL(file2.getCatalog()[0], "/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D");
+  BOOST_CHECK_EQUAL(file2.getCatalog()[1], "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E");
+  BOOST_CHECK_EQUAL(file2.getCommonPrefix(), "/ndn/multicast/NTORRENT/linux15.01");
 }
 
 BOOST_AUTO_TEST_CASE(CheckEncodeDecodeNoTorrentFilePtr)
 {
-  TorrentFile file("/NTORRENT/linux15.01/torrent-file/AB2CDA",
-                   "/NTORRENT/linux15.01",
-                   {"/NTORRENT/linux15.01/file0/1A2B3C4D",
-                   "/NTORRENT/linux15.01/file1/2A3B4C5E"});
+  TorrentFile file("/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA",
+                   "/ndn/multicast/NTORRENT/linux15.01",
+                   {"/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D",
+                   "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E"});
 
   file.finalize();
   KeyChain keyChain;
@@ -191,16 +191,16 @@ BOOST_AUTO_TEST_CASE(CheckEncodeDecodeNoTorrentFilePtr)
   TorrentFile file2;
   file2.wireDecode(wire);
 
-  BOOST_CHECK_EQUAL(file2.getName(), "/NTORRENT/linux15.01/torrent-file/AB2CDA");
+  BOOST_CHECK_EQUAL(file2.getName(), "/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA");
   BOOST_CHECK(!file2.getTorrentFilePtr());
   BOOST_CHECK_EQUAL(file2.getCatalog().size(), 2);
-  BOOST_CHECK_EQUAL(file2.getCatalog()[0], "/NTORRENT/linux15.01/file0/1A2B3C4D");
-  BOOST_CHECK_EQUAL(file2.getCatalog()[1], "/NTORRENT/linux15.01/file1/2A3B4C5E");
+  BOOST_CHECK_EQUAL(file2.getCatalog()[0], "/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D");
+  BOOST_CHECK_EQUAL(file2.getCatalog()[1], "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E");
 }
 
 BOOST_AUTO_TEST_CASE(CheckEncodeDecodeEmptyTorrentFile)
 {
-  TorrentFile file("/NTORRENT/linux15.01/torrent-file/AB2CDA",
+  TorrentFile file("/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA",
                   "",
                   {});
 
@@ -219,9 +219,9 @@ BOOST_AUTO_TEST_CASE(CheckEncodeDecodeEmptyTorrentFile)
 BOOST_AUTO_TEST_CASE(CheckEncodeDecodeEmptyCatalog)
 {
 
-  TorrentFile file("/NTORRENT/linux15.01/torrent-file/AB2CDA",
-                  "/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
-                  "/NTORRENT/linux15.01",
+  TorrentFile file("/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA",
+                  "/ndn/multicast/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
+                  "/ndn/multicast/NTORRENT/linux15.01",
                   {});
 
   file.finalize();
@@ -252,30 +252,30 @@ BOOST_AUTO_TEST_CASE(DecodeFromWire)
 
 BOOST_AUTO_TEST_CASE(TestInsertErase)
 {
-  TorrentFile file("/NTORRENT/linux15.01/torrent-file/AB2CDA",
-                   "/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
-                   "/NTORRENT/linux15.01",
-                   {"/NTORRENT/linux15.01/file0/1A2B3C4D",
-                   "/NTORRENT/linux15.01/file1/2A3B4C5E"});
+  TorrentFile file("/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA",
+                   "/ndn/multicast/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
+                   "/ndn/multicast/NTORRENT/linux15.01",
+                   {"/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D",
+                   "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E"});
 
-  file.erase("/NTORRENT/linux15.01/file0/1A2B3C4D");
-  BOOST_CHECK_EQUAL(file.getCatalog()[0], "/NTORRENT/linux15.01/file1/2A3B4C5E");
+  file.erase("/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D");
+  BOOST_CHECK_EQUAL(file.getCatalog()[0], "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E");
 
-  file.erase("/NTORRENT/linux15.01/file1/2A3B4C5E");
+  file.erase("/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E");
   BOOST_CHECK_EQUAL(file.getCatalog().size(), 0);
 
-  file.insert("/NTORRENT/linux15.01/file3/AB34C5KA");
+  file.insert("/ndn/multicast/NTORRENT/linux15.01/file3/AB34C5KA");
   BOOST_CHECK_EQUAL(file.getCatalog().size(), 1);
-  BOOST_CHECK_EQUAL(file.getCatalog()[0], "/NTORRENT/linux15.01/file3/AB34C5KA");
+  BOOST_CHECK_EQUAL(file.getCatalog()[0], "/ndn/multicast/NTORRENT/linux15.01/file3/AB34C5KA");
 }
 
 BOOST_AUTO_TEST_CASE(TestInsertAndEncodeTwice)
 {
-  TorrentFile file("/NTORRENT/linux15.01/torrent-file/AB2CDA",
-                   "/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
-                   "/NTORRENT/linux15.01",
-                   {"/NTORRENT/linux15.01/file0/1A2B3C4D",
-                   "/NTORRENT/linux15.01/file1/2A3B4C5E"});
+  TorrentFile file("/ndn/multicast/NTORRENT/linux15.01/torrent-file/AB2CDA",
+                   "/ndn/multicast/NTORRENT/linux15.01/torrent-file/segment2/AE321C",
+                   "/ndn/multicast/NTORRENT/linux15.01",
+                   {"/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D",
+                   "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E"});
 
   file.finalize();
   KeyChain keyChain;
@@ -286,18 +286,18 @@ BOOST_AUTO_TEST_CASE(TestInsertAndEncodeTwice)
   file2.wireDecode(wire);
   BOOST_CHECK_EQUAL(file2.getCatalog().size(), 2);
 
-  file.insert("/NTORRENT/linux15.01/file3/AB34C5KA");
-  file.insert("/NTORRENT/linux15.01/file4/CB24C3GB");
+  file.insert("/ndn/multicast/NTORRENT/linux15.01/file3/AB34C5KA");
+  file.insert("/ndn/multicast/NTORRENT/linux15.01/file4/CB24C3GB");
   file.finalize();
   Block wire2 = file.wireEncode();
 
   file2.wireDecode(wire2);
   BOOST_CHECK_EQUAL(file2.getCatalog().size(), 4);
 
-  BOOST_CHECK_EQUAL(file2.getCatalog()[0], "/NTORRENT/linux15.01/file0/1A2B3C4D");
-  BOOST_CHECK_EQUAL(file2.getCatalog()[1], "/NTORRENT/linux15.01/file1/2A3B4C5E");
-  BOOST_CHECK_EQUAL(file2.getCatalog()[2], "/NTORRENT/linux15.01/file3/AB34C5KA");
-  BOOST_CHECK_EQUAL(file2.getCatalog()[3], "/NTORRENT/linux15.01/file4/CB24C3GB");
+  BOOST_CHECK_EQUAL(file2.getCatalog()[0], "/ndn/multicast/NTORRENT/linux15.01/file0/1A2B3C4D");
+  BOOST_CHECK_EQUAL(file2.getCatalog()[1], "/ndn/multicast/NTORRENT/linux15.01/file1/2A3B4C5E");
+  BOOST_CHECK_EQUAL(file2.getCatalog()[2], "/ndn/multicast/NTORRENT/linux15.01/file3/AB34C5KA");
+  BOOST_CHECK_EQUAL(file2.getCatalog()[3], "/ndn/multicast/NTORRENT/linux15.01/file4/CB24C3GB");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
@@ -387,7 +387,7 @@ BOOST_AUTO_TEST_CASE(TestTorrentFileGenerator)
         // Verify that each file torrent-file is signed
         BOOST_CHECK_NO_THROW(it->getFullName());
         BOOST_CHECK_EQUAL(it->getCommonPrefix(),
-                          Name("/NTORRENT" +
+                          Name("/ndn/multicast/NTORRENT" +
                                directoryPathName.getSubName(
                                  directoryPathName.size() - 1).toUri()));
         BOOST_CHECK_EQUAL(*it, TorrentFile(it->wireEncode()));

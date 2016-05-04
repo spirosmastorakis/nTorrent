@@ -341,9 +341,9 @@ private:
   uint64_t                                                            m_sortingCounter;
   // Keychain instance
   shared_ptr<KeyChain>                                                m_keyChain;
-
+  // A collection for all interests that have been sent for which we have not received a response
   std::unordered_set<ndn::Name>                                       m_pendingInterests;
-
+  // A queue to hold all interests for requested data that we have yet to send
   shared_ptr<InterestQueue>                                           m_interestQueue;
   // TODO(spyros) Fix and reintegrate update handler
   // // Update Handler instance
@@ -391,14 +391,6 @@ bool
 TorrentManager::hasAllTorrentSegments() const
 {
   return findTorrentFileSegmentToDownload() == nullptr;
-}
-
-inline
-void
-TorrentManager::shutdown()
-{
-  // TODO(msweatt) Consider unregistering all prefix to exit more gracefully
-  m_face->shutdown();
 }
 
 }  // end ntorrent

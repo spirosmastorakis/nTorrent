@@ -312,7 +312,7 @@ FileManifest::submanifest_ptr() const
 inline std::string
 FileManifest::file_name() const
 {
-  return name().getSubName(1, name().size() - 2).toUri();
+  return name().getSubName(3, name().size() - 4).toUri();
 }
 
 

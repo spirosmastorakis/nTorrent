@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
           manifests.insert(manifests.end(), ms.first.begin(), ms.first.end());
         }
         auto torrentPrefix = fs::canonical(dataPath).filename().string();
-        outputPath += torrentPrefix;
+        outputPath += ("/" + torrentPrefix);
         auto torrentPath =  outputPath + "/torrent_files/";
         // write all the torrent segments
         for (const TorrentFile& t : torrentSegments) {

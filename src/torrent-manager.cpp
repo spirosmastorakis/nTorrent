@@ -17,6 +17,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <boost/asio/io_service.hpp>
 
 namespace fs = boost::filesystem;
 
@@ -32,7 +33,6 @@ intializeTorrentSegments(const string& torrentFilePath, const Name& initialSegme
   security::KeyChain key_chain;
   Name currSegmentFullName = initialSegmentName;
   vector<TorrentFile> torrentSegments = IoUtil::load_directory<TorrentFile>(torrentFilePath);
-
   // Starting with the initial segment name, verify the names, loading next name from torrentSegment
   for (auto it = torrentSegments.begin(); it != torrentSegments.end(); ++it) {
     TorrentFile& segment = *it;
@@ -169,10 +169,10 @@ void TorrentManager::Initialize()
   // figure out the name of the torrent
   Name torrentName;
   if (m_torrentFileName.get(m_torrentFileName.size() - 2).isSequenceNumber()) {
-    torrentName = m_torrentFileName.getSubName(1, m_torrentFileName.size() - 4);
+    torrentName = m_torrentFileName.getSubName(3, m_torrentFileName.size() - 6);
   }
   else {
-    torrentName = m_torrentFileName.getSubName(1, m_torrentFileName.size() - 3);
+    torrentName = m_torrentFileName.getSubName(3, m_torrentFileName.size() - 5);
   }
 
   // TODO(spyros) Get update manager working
@@ -406,7 +406,6 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
       this->sendInterest();
       if (m_pendingInterests.empty() && m_interestQueue->empty() && !m_seedFlag) {
         shutdown();
-        return;
       }
   };
 
@@ -518,6 +517,12 @@ void TorrentManager::seed(const Data& data) {
                            bind(&TorrentManager::onInterestReceived, this, _1, _2),
                            RegisterPrefixSuccessCallback(),
                            bind(&TorrentManager::onRegisterFailed, this, _1, _2));
+}
+
+void
+TorrentManager::shutdown()
+{
+  m_face->getIoService().stop();
 }
 
 // = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = = =
@@ -650,7 +655,6 @@ TorrentManager::downloadFileManifestSegment(const Name& manifestName,
     this->sendInterest();
     if (m_pendingInterests.empty() && m_interestQueue->empty() && !m_seedFlag) {
       shutdown();
-      return;
     }
   };
 
