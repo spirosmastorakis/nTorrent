@@ -21,6 +21,7 @@
 #include "file-manifest.hpp"
 
 #include "util/io-util.hpp"
+#include "util/shared-constants.hpp"
 
 #include <limits>
 
@@ -328,6 +329,15 @@ bool operator!=(const FileManifest& lhs, const FileManifest& rhs) {
       )
       || lhs.catalog()          != rhs.catalog();
 }
+
+std::string
+FileManifest::file_name() const
+{
+  Name scheme(SharedConstants::commonPrefix);
+  return name().getSubName(1 + scheme.size(),
+         name().size() - (2 + scheme.size())).toUri();
+}
+
 
 }  // end ntorrent
 }  // end ndn

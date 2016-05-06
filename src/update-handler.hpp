@@ -23,6 +23,7 @@
 #define UPDATE_HANDLER_H
 
 #include "stats-table.hpp"
+#include "util/shared-constants.hpp"
 
 #include <ndn-cxx/face.hpp>
 #include <ndn-cxx/interest.hpp>
@@ -33,6 +34,8 @@ namespace ntorrent {
 
 class UpdateHandler {
 public:
+  typedef std::function<void()> OnOwnRoutablePrefixFailed;
+
   class Error : public tlv::Error
   {
   public:
@@ -44,7 +47,8 @@ public:
   };
 
   UpdateHandler(Name torrentName, shared_ptr<KeyChain> keyChain,
-                shared_ptr<StatsTable> statsTable, shared_ptr<Face> face);
+                shared_ptr<StatsTable> statsTable, shared_ptr<Face> face,
+                OnOwnRoutablePrefixFailed onOwnRoutablePrefixFailed = {});
 
   ~UpdateHandler();
 
@@ -66,19 +70,20 @@ public:
   bool
   needsUpdate();
 
-  enum {
-    // Maximum number of names to be encoded as a response to an "ALIVE" Interest
-    MAX_NUM_OF_ENCODED_NAMES = 5,
-    // Minimum number of routable prefixes that the peer would like to have
-    MIN_NUM_OF_ROUTABLE_NAMES = 5,
-  };
-
 protected:
   // Used for testing purposes
   const Name&
   getOwnRoutablePrefix();
 
 private:
+  enum {
+    // Maximum number of names to be encoded as a response to an "ALIVE" Interest
+    MAX_NUM_OF_ENCODED_NAMES = 5,
+    // Minimum number of routable prefixes that the peer would like to have
+    MIN_NUM_OF_ROUTABLE_NAMES = 5,
+    OWN_ROUTABLE_PREFIX_RETRIES = 5,
+  };
+
   template<encoding::Tag TAG>
   size_t
   encodeContent(EncodingImpl<TAG>& encoder) const;
@@ -113,7 +118,7 @@ private:
    * published data is available
    */
   void
-  learnOwnRoutablePrefix();
+  learnOwnRoutablePrefix(OnOwnRoutablePrefixFailed onOwnRoutablePrefixFailed);
 
   void
   tryNextRoutablePrefix(const Interest& interest);
@@ -124,18 +129,22 @@ private:
   shared_ptr<StatsTable> m_statsTable;
   shared_ptr<Face> m_face;
   Name m_ownRoutablePrefix;
+  size_t m_ownRoutablPrefixRetries;
 };
 
 inline
 UpdateHandler::UpdateHandler(Name torrentName, shared_ptr<KeyChain> keyChain,
-                             shared_ptr<StatsTable> statsTable, shared_ptr<Face> face)
+                             shared_ptr<StatsTable> statsTable, shared_ptr<Face> face,
+                             OnOwnRoutablePrefixFailed onOwnRoutablePrefixFailed)
 : m_torrentName(torrentName)
 , m_keyChain(keyChain)
 , m_statsTable(statsTable)
 , m_face(face)
+, m_ownRoutablPrefixRetries(0)
 {
-  this->learnOwnRoutablePrefix();
-  m_face->setInterestFilter(Name("/NTORRENT" + m_torrentName.toUri() + "/ALIVE"),
+  this->learnOwnRoutablePrefix(onOwnRoutablePrefixFailed);
+  Name prependedComponents(SharedConstants::commonPrefix);
+  m_face->setInterestFilter(Name(prependedComponents.toUri() + "/NTORRENT" + m_torrentName.toUri() + "/ALIVE"),
                             bind(&UpdateHandler::onInterestReceived, this, _1, _2),
                             RegisterPrefixSuccessCallback(),
                             bind(&UpdateHandler::onRegisterFailed, this, _1, _2));

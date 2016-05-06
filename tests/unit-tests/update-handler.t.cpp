@@ -129,14 +129,14 @@ BOOST_AUTO_TEST_CASE(TestAliveInterestExchange)
   handler2.sendAliveInterest(table2->begin());
 
   advanceClocks(time::milliseconds(1), 40);
-  Interest interest(Name("/NTORRENT/linux15.01/ALIVE/test"));
+  Interest interest(Name("ndn/multicast/NTORRENT/linux15.01/ALIVE/test"));
   face1->receive(interest);
 
   advanceClocks(time::milliseconds(1), 10);
   std::vector<Data> dataVec = face1->sentData;
 
   BOOST_CHECK_EQUAL(dataVec.size(), 1);
-  BOOST_CHECK_EQUAL(dataVec[0].getName().toUri(), "/NTORRENT/linux15.01/ALIVE/test");
+  BOOST_CHECK_EQUAL(dataVec[0].getName().toUri(), "/ndn/multicast/NTORRENT/linux15.01/ALIVE/test");
 
   auto block = dataVec[0].getContent();
   shared_ptr<vector<Name>> nameVec = DummyParser::decodeContent(block);
@@ -152,7 +152,7 @@ BOOST_AUTO_TEST_CASE(TestAliveInterestExchange)
 
   BOOST_CHECK_EQUAL((table1->end() - 1)->getRecordName().toUri(), "/test");
 
-  d = DummyParser::createDataPacket(Name("/NTORRENT/linux15.01/ALIVE/arizona"),
+  d = DummyParser::createDataPacket(Name("ndn/multicast/NTORRENT/linux15.01/ALIVE/arizona"),
                                      { Name("isp1"), Name("isp2"), Name("isp3") });
   keyChain->sign(*d);
 
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(TestAliveInterestExchange)
   handler2.sendAliveInterest(table2->begin());
 
   advanceClocks(time::milliseconds(1), 40);
-  Interest interest2(Name("/NTORRENT/linux15.01/ALIVE/arizona"));
+  Interest interest2(Name("ndn/multicast/NTORRENT/linux15.01/ALIVE/arizona"));
   face1->receive(interest2);
 
   advanceClocks(time::milliseconds(1), 10);

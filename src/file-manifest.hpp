@@ -21,8 +21,6 @@
 #ifndef INCLUDED_FILE_MANIFEST_HPP
 #define INCLUDED_FILE_MANIFEST_HPP
 
-#include "util/shared-constants.hpp"
-
 #include <cstring>
 #include <memory>
 #include <string>
@@ -31,6 +29,8 @@
 
 #include <ndn-cxx/data.hpp>
 #include <ndn-cxx/name.hpp>
+
+#include "util/shared-constants.hpp"
 
 namespace ndn {
 namespace ntorrent {
@@ -320,15 +320,6 @@ FileManifest::submanifest_ptr() const
 {
   return m_submanifestPtr;
 }
-
-inline std::string
-FileManifest::file_name() const
-{
-  Name scheme(SharedConstants::commonPrefix);
-  return name().getSubName(1 + scheme.size(),
-         name().size() - (2 + scheme.size())).toUri();
-}
-
 
 inline size_t
 FileManifest::submanifest_number() const

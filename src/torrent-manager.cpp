@@ -20,8 +20,8 @@
 */
 
 #include "torrent-manager.hpp"
-
 #include "file-manifest.hpp"
+
 #include "torrent-file.hpp"
 #include "util/io-util.hpp"
 #include "util/logging.hpp"
@@ -178,9 +178,9 @@ void TorrentManager::Initialize()
     torrentName = m_torrentFileName.getSubName(1 + scheme.size(), m_torrentFileName.size() - (3 + scheme.size()));
   }
 
-  // TODO(spyros) Get update manager working
-  // m_updateHandler = make_shared<UpdateHandler>(torrentName, m_keyChain,
-  //                                               make_shared<StatsTable>(m_statsTable), m_face);
+  m_updateHandler = make_shared<UpdateHandler>(torrentName, m_keyChain,
+                                               make_shared<StatsTable>(m_statsTable), m_face,
+                                               std::bind(&TorrentManager::shutdown, this));
 
   // .../<torrent_name>/torrent-file/<implicit_digest>
   string dataPath = ".appdata/" + m_torrentFileName.get(-3).toUri();
@@ -783,10 +783,11 @@ TorrentManager::createInterest(Name name)
   interest->setMustBeFresh(true);
 
   // Select routable prefix
-  // TODO(spyros) Fix links
-  // Link link(name, { {1, m_stats_table_iter->getRecordName()} });
-  // m_keyChain->sign(link, signingWithSha256());
-  // Block linkWire = link.wireEncode();
+  // Create and set the forwarding hint
+  Delegation del;
+  del.preference = 1;
+  del.name = m_stats_table_iter->getRecordName();
+  DelegationList list({del});
 
   // Stats Table update here...
   m_stats_table_iter->incrementSentInterests();
@@ -795,9 +796,9 @@ TorrentManager::createInterest(Name name)
   if (m_sortingCounter >= SORTING_INTERVAL) {
     // Use the sorting interval to send out "ALIVE" Interests as well
     // check whether we should send out an "ALIVE" Interest
-    // if (m_updateHandler->needsUpdate()) {
-    //   m_updateHandler->sendAliveInterest(m_stats_table_iter);
-    // }
+    if (m_updateHandler->needsUpdate()) {
+      m_updateHandler->sendAliveInterest(m_stats_table_iter);
+    }
     // Do the actual sorting related stuff
     m_sortingCounter = 0;
     m_statsTable.sort();
@@ -805,7 +806,7 @@ TorrentManager::createInterest(Name name)
     m_retries = 0;
   }
 
-  // interest->setLink(linkWire);
+  interest->setForwardingHint(list);
 
   return interest;
 }

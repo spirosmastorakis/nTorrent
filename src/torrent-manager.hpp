@@ -349,7 +349,7 @@ private:
   shared_ptr<InterestQueue>                                           m_interestQueue;
   // TODO(spyros) Fix and reintegrate update handler
   // // Update Handler instance
-  // shared_ptr<UpdateHandler>                                           m_updateHandler;
+  shared_ptr<UpdateHandler>                                           m_updateHandler;
 };
 
 inline
@@ -376,8 +376,8 @@ TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
 
   // Hardcoded prefixes for now
   // TODO(Spyros): Think of something more clever to bootstrap...
-  m_statsTable.insert("/ucla");
-  m_statsTable.insert("/arizona");
+  m_statsTable.insert("ndn/edu/ucla");
+  m_statsTable.insert("ndn/edu/ucla/remap");
   m_stats_table_iter = m_statsTable.begin();
 }
 

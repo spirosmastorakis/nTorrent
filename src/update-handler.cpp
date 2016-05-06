@@ -30,7 +30,8 @@ namespace ntorrent {
 void
 UpdateHandler::sendAliveInterest(StatsTable::iterator iter)
 {
-  Name interestName = Name("/NTORRENT" + m_torrentName.toUri() +
+  Name prependedComponents(SharedConstants::commonPrefix);
+  Name interestName = Name(prependedComponents.toUri() + "/NTORRENT" + m_torrentName.toUri() +
                            "/ALIVE" + m_ownRoutablePrefix.toUri());
 
   shared_ptr<Interest> i = make_shared<Interest>(interestName);
@@ -44,17 +45,18 @@ UpdateHandler::sendAliveInterest(StatsTable::iterator iter)
 
   i->setForwardingHint(list);
 
+  LOG_DEBUG << "Sending ALIVE Interest: " << i << std::endl;
+
   m_face->expressInterest(*i, bind(&UpdateHandler::decodeDataPacketContent, this, _1, _2),
                           bind(&UpdateHandler::tryNextRoutablePrefix, this, _1),
                           bind(&UpdateHandler::tryNextRoutablePrefix, this, _1));
-  m_face->processEvents(time::milliseconds(-1));
 }
 
 shared_ptr<Data>
 UpdateHandler::createDataPacket(const Name& name)
 {
   // Parse the sender's routable prefix contained in the name
-  Name sendersRoutablePrefix = name.getSubName(2 + m_torrentName.size());
+  Name sendersRoutablePrefix = name.getSubName(2 + 2 + m_torrentName.size());
 
   if (m_statsTable->find(sendersRoutablePrefix) == m_statsTable->end()) {
     m_statsTable->insert(sendersRoutablePrefix);
@@ -147,7 +149,7 @@ UpdateHandler::needsUpdate()
 }
 
 void
-UpdateHandler::learnOwnRoutablePrefix()
+UpdateHandler::learnOwnRoutablePrefix(OnOwnRoutablePrefixFailed onOwnRoutablePrefixFailed)
 {
   Interest i(Name("/localhop/nfd/rib/routable-prefixes"));
   i.setInterestLifetime(time::milliseconds(100));
@@ -161,23 +163,29 @@ UpdateHandler::learnOwnRoutablePrefix()
     element->parse();
     Name ownRoutablePrefix(*element);
     m_ownRoutablePrefix = ownRoutablePrefix;
+    LOG_DEBUG << "Own routable prefix received: " << m_ownRoutablePrefix << std::endl;
   };
 
-  auto prefixRetrievalFailed = [this] (const Interest&) {
+  auto prefixRetrievalFailed = [this, onOwnRoutablePrefixFailed] (const Interest&) {
+    ++m_ownRoutablPrefixRetries;
     LOG_ERROR << "Own Routable Prefix Retrieval Failed. Trying again." << std::endl;
-    // TODO(Spyros): This could lead to an infinite loop. Figure out something better...
-    this->learnOwnRoutablePrefix();
+    // If we fail, we will retry OWN_ROUTABLE_PREFIX_RETRIES times
+    if (m_ownRoutablPrefixRetries < OWN_ROUTABLE_PREFIX_RETRIES) {
+      this->learnOwnRoutablePrefix(onOwnRoutablePrefixFailed);
+    }
+    else {
+      onOwnRoutablePrefixFailed();
+    }
   };
 
   //TODO(Spyros): For now, we do nothing when we receive a NACK
   m_face->expressInterest(i, prefixReceived, nullptr, prefixRetrievalFailed);
-  m_face->processEvents(time::milliseconds(-1));
 }
 
 void
 UpdateHandler::onInterestReceived(const InterestFilter& filter, const Interest& interest)
 {
-  LOG_INFO << "Interest Received: " << interest.getName().toUri() << std::endl;
+  LOG_INFO << "ALIVE Interest Received: " << interest.getName().toUri() << std::endl;
   shared_ptr<Data> data = this->createDataPacket(interest.getName());
   m_keyChain->sign(*data, signingWithSha256());
   m_face->put(*data);
@@ -224,7 +232,6 @@ UpdateHandler::tryNextRoutablePrefix(const Interest& interest)
   m_face->expressInterest(*newInterest, bind(&UpdateHandler::decodeDataPacketContent, this, _1, _2),
                           bind(&UpdateHandler::tryNextRoutablePrefix, this, _1),
                           bind(&UpdateHandler::tryNextRoutablePrefix, this, _1));
-  m_face->processEvents(time::milliseconds(-1));
 }
 
 } // namespace ntorrent
