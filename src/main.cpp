@@ -50,6 +50,11 @@ public:
   }
 };
 
+namespace ntorrent {
+
+const char * SharedConstants::commonPrefix = "/ndn";
+
+} // end ntorrent
 } // end ndn
 
 // TODO(msweatt) Add options verification

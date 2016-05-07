@@ -22,4 +22,14 @@
 #define BOOST_TEST_MAIN 1
 #define BOOST_TEST_DYN_LINK 1
 
+#include "util/shared-constants.hpp"
+
 #include <boost/test/unit_test.hpp>
+
+namespace ndn {
+namespace ntorrent {
+
+const char * SharedConstants::commonPrefix = "/ndn/multicast";
+
+} // namespace ntorrent
+} // namespace ndn

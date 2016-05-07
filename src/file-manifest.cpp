@@ -65,7 +65,7 @@ get_name_of_manifest(const std::string& filePath, const Name& manifestPrefix)
                                               manifestPrefix.toUri() + " and "     +
                                               full_path.toUri()));
   }
-  ndn::Name manifestName = "/ndn/multicast/NTORRENT/";
+  ndn::Name manifestName(SharedConstants::commonPrefix + std::string("/NTORRENT/"));
   // Rebuild the name to be the suffix from the matching component
   for (auto it = (name_component_iter.base() - 1); full_path.end() != it; ++it) {
     manifestName.append(*it);

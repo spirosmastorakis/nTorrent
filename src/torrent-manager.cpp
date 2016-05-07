@@ -1,3 +1,24 @@
+/* -*- Mode:C++; c-file-style:"gnu"; indent-tabs-mode:nil; -*- */
+/**
+* Copyright (c) 2016 Regents of the University of California.
+*
+* This file is part of the nTorrent codebase.
+*
+* nTorrent is free software: you can redistribute it and/or modify it under the
+* terms of the GNU Lesser General Public License as published by the Free Software
+* Foundation, either version 3 of the License, or (at your option) any later version.
+*
+* nTorrent is distributed in the hope that it will be useful, but WITHOUT ANY
+* WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+* PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+*
+* You should have received copies of the GNU General Public License and GNU Lesser
+* General Public License along with nTorrent, e.g., in COPYING.md file. If not, see
+* <http://www.gnu.org/licenses/>.
+*
+* See AUTHORS for complete list of nTorrent authors and contributors.
+*/
+
 #include "torrent-manager.hpp"
 
 #include "file-manifest.hpp"
@@ -168,11 +189,12 @@ void TorrentManager::Initialize()
 
   // figure out the name of the torrent
   Name torrentName;
+  Name scheme(SharedConstants::commonPrefix);
   if (m_torrentFileName.get(m_torrentFileName.size() - 2).isSequenceNumber()) {
-    torrentName = m_torrentFileName.getSubName(3, m_torrentFileName.size() - 6);
+    torrentName = m_torrentFileName.getSubName(1 + scheme.size(), m_torrentFileName.size() - (4 + scheme.size()));
   }
   else {
-    torrentName = m_torrentFileName.getSubName(3, m_torrentFileName.size() - 5);
+    torrentName = m_torrentFileName.getSubName(1 + scheme.size(), m_torrentFileName.size() - (3 + scheme.size()));
   }
 
   // TODO(spyros) Get update manager working

@@ -21,6 +21,8 @@
 #ifndef INCLUDED_FILE_MANIFEST_HPP
 #define INCLUDED_FILE_MANIFEST_HPP
 
+#include "util/shared-constants.hpp"
+
 #include <cstring>
 #include <memory>
 #include <string>
@@ -312,7 +314,9 @@ FileManifest::submanifest_ptr() const
 inline std::string
 FileManifest::file_name() const
 {
-  return name().getSubName(3, name().size() - 4).toUri();
+  Name scheme(SharedConstants::commonPrefix);
+  return name().getSubName(1 + scheme.size(),
+         name().size() - (2 + scheme.size())).toUri();
 }
 
 

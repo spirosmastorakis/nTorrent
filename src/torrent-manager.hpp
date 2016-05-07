@@ -18,6 +18,7 @@
 *
 * See AUTHORS for complete list of nTorrent authors and contributors.
 */
+
 #ifndef INCLUDED_TORRENT_FILE_MANAGER_H
 #define INCLUDED_TORRENT_FILE_MANAGER_H
 
