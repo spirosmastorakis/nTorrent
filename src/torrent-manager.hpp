@@ -55,6 +55,8 @@ class TorrentManager : noncopyable {
    typedef std::function<void(const std::vector<ndn::Name>&)>        ManifestReceivedCallback;
    typedef std::function<void(const std::vector<ndn::Name>&)>        TorrentFileReceivedCallback;
    typedef std::function<void(const ndn::Name&, const std::string&)> FailedCallback;
+   typedef std::tuple<DataCallback, TimeoutCallback>                 PendingInterestQueueEntry;
+   typedef std::unordered_map<ndn::Name, PendingInterestQueueEntry>  PendingInterestQueue;
 
    /*
     * \brief Create a new Torrent manager with the specified parameters.
@@ -308,6 +310,9 @@ class TorrentManager : noncopyable {
   void
   onRegisterFailed(const Name& prefix, const std::string& reason);
 
+  void
+  eraseOwnRoutablePrefix();
+
 protected:
   // A map from each fileManifest a bitmap of which Data packets this manager currently has
   mutable std::unordered_map<Name, std::vector<bool>>                 m_fileStates;
@@ -329,6 +334,9 @@ private:
   void
   sendInterest();
 
+  void
+  nackCallBack(const Interest& i, const lp::Nack& n);
+
   // A flag to determine if upon completion we should continue seeding
   bool                                                                m_seedFlag;
   // Face used for network communication
@@ -344,7 +352,7 @@ private:
   // Keychain instance
   shared_ptr<KeyChain>                                                m_keyChain;
   // A collection for all interests that have been sent for which we have not received a response
-  std::unordered_set<ndn::Name>                                       m_pendingInterests;
+  PendingInterestQueue                                                m_pendingInterests;
   // A queue to hold all interests for requested data that we have yet to send
   shared_ptr<InterestQueue>                                           m_interestQueue;
   // TODO(spyros) Fix and reintegrate update handler
@@ -376,8 +384,8 @@ TorrentManager::TorrentManager(const ndn::Name&      torrentFileName,
 
   // Hardcoded prefixes for now
   // TODO(Spyros): Think of something more clever to bootstrap...
-  m_statsTable.insert("ndn/edu/ucla");
-  m_statsTable.insert("ndn/edu/ucla/remap");
+  m_statsTable.insert("ndn/edu/wustl");
+  m_statsTable.insert("ndn/edu/wustl");
   m_stats_table_iter = m_statsTable.begin();
 }
 

@@ -35,6 +35,7 @@
 
 #include <ndn-cxx/util/dummy-client-face.hpp>
 #include <ndn-cxx/util/io.hpp>
+#include <ndn-cxx/security/signature-sha256-with-rsa.hpp>
 
 namespace ndn {
 namespace ntorrent {

@@ -23,6 +23,8 @@
 
 #define BOOST_LOG_DYN_LINK 1
 
+#include <iostream>
+
 #include <boost/log/core.hpp>
 #include <boost/log/sources/global_logger_storage.hpp>
 #include <boost/log/sources/severity_logger.hpp>
@@ -35,12 +37,12 @@ BOOST_LOG_INLINE_GLOBAL_LOGGER_DEFAULT(logger, boost::log::sources::severity_log
 #define LOG(severity) BOOST_LOG_SEV(logger::get(), boost::log::trivial::severity)
 
 // ===== log macros =====
-#define LOG_TRACE   LOG(trace)
-#define LOG_DEBUG   LOG(debug)
-#define LOG_INFO    LOG(info)
-#define LOG_WARNING LOG(warning)
-#define LOG_ERROR   LOG(error)
-#define LOG_FATAL   LOG(fatal)
+#define LOG_TRACE   std::cerr
+#define LOG_DEBUG   std::cerr
+#define LOG_INFO    std::cerr
+#define LOG_WARNING std::cerr
+#define LOG_ERROR   std::cerr
+#define LOG_FATAL   std::cerr
 
 namespace ndn {
 namespace ntorrent {

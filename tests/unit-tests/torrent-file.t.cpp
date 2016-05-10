@@ -35,7 +35,7 @@
 
 namespace fs = boost::filesystem;
 
-BOOST_TEST_DONT_PRINT_LOG_VALUE(std::nullptr_t)
+// BOOST_TEST_DONT_PRINT_LOG_VALUE(std::nullptr_t)
 
 namespace ndn {
 
@@ -449,7 +449,7 @@ BOOST_AUTO_TEST_CASE(TestTorrentFileGenerator)
           fileNum++;
           auto filename = dirPath + to_string(fileNum);
           auto torrent_ptr = io::load<TorrentFile>(filename);
-          BOOST_CHECK_NE(torrent_ptr, nullptr);
+          //BOOST_CHECK_NE(torrent_ptr, nullptr);
           BOOST_CHECK_EQUAL(s, *torrent_ptr);
         }
         fs::remove_all(dirPath);

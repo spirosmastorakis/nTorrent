@@ -34,7 +34,7 @@ namespace ntorrent {
 
 class UpdateHandler {
 public:
-  typedef std::function<void()> OnOwnRoutablePrefixFailed;
+  typedef std::function<void()> OnReceivedOwnRoutablePrefix;
 
   class Error : public tlv::Error
   {
@@ -48,7 +48,7 @@ public:
 
   UpdateHandler(Name torrentName, shared_ptr<KeyChain> keyChain,
                 shared_ptr<StatsTable> statsTable, shared_ptr<Face> face,
-                OnOwnRoutablePrefixFailed onOwnRoutablePrefixFailed = {});
+                OnReceivedOwnRoutablePrefix onReceivedOwnRoutablePrefix = {});
 
   ~UpdateHandler();
 
@@ -70,12 +70,6 @@ public:
   bool
   needsUpdate();
 
-protected:
-  // Used for testing purposes
-  const Name&
-  getOwnRoutablePrefix();
-
-private:
   enum {
     // Maximum number of names to be encoded as a response to an "ALIVE" Interest
     MAX_NUM_OF_ENCODED_NAMES = 5,
@@ -84,6 +78,10 @@ private:
     OWN_ROUTABLE_PREFIX_RETRIES = 5,
   };
 
+  const Name&
+  getOwnRoutablePrefix();
+
+private:
   template<encoding::Tag TAG>
   size_t
   encodeContent(EncodingImpl<TAG>& encoder) const;
@@ -118,7 +116,7 @@ private:
    * published data is available
    */
   void
-  learnOwnRoutablePrefix(OnOwnRoutablePrefixFailed onOwnRoutablePrefixFailed);
+  learnOwnRoutablePrefix(OnReceivedOwnRoutablePrefix onReceivedOwnRoutablePrefix);
 
   void
   tryNextRoutablePrefix(const Interest& interest);
@@ -135,19 +133,14 @@ private:
 inline
 UpdateHandler::UpdateHandler(Name torrentName, shared_ptr<KeyChain> keyChain,
                              shared_ptr<StatsTable> statsTable, shared_ptr<Face> face,
-                             OnOwnRoutablePrefixFailed onOwnRoutablePrefixFailed)
+                             OnReceivedOwnRoutablePrefix onReceivedOwnRoutablePrefix)
 : m_torrentName(torrentName)
 , m_keyChain(keyChain)
 , m_statsTable(statsTable)
 , m_face(face)
 , m_ownRoutablPrefixRetries(0)
 {
-  this->learnOwnRoutablePrefix(onOwnRoutablePrefixFailed);
-  Name prependedComponents(SharedConstants::commonPrefix);
-  m_face->setInterestFilter(Name(prependedComponents.toUri() + "/NTORRENT" + m_torrentName.toUri() + "/ALIVE"),
-                            bind(&UpdateHandler::onInterestReceived, this, _1, _2),
-                            RegisterPrefixSuccessCallback(),
-                            bind(&UpdateHandler::onRegisterFailed, this, _1, _2));
+  this->learnOwnRoutablePrefix(onReceivedOwnRoutablePrefix);
 }
 
 inline

@@ -180,7 +180,8 @@ void TorrentManager::Initialize()
 
   m_updateHandler = make_shared<UpdateHandler>(torrentName, m_keyChain,
                                                make_shared<StatsTable>(m_statsTable), m_face,
-                                               std::bind(&TorrentManager::shutdown, this));
+                                               std::bind(&TorrentManager::eraseOwnRoutablePrefix,
+                                                         this));
 
   // .../<torrent_name>/torrent-file/<implicit_digest>
   string dataPath = ".appdata/" + m_torrentFileName.get(-3).toUri();
@@ -442,6 +443,9 @@ TorrentManager::downloadTorrentFile(const std::string& path,
 {
   shared_ptr<Name> searchRes = this->findTorrentFileSegmentToDownload();
   auto manifestNames = make_shared<std::vector<Name>>();
+  if (m_updateHandler->needsUpdate() && !(m_updateHandler->getOwnRoutablePrefix().empty())) {
+    //m_updateHandler->sendAliveInterest(m_stats_table_iter);
+  }
   if (searchRes != nullptr) {
     this->downloadTorrentFileSegment(*searchRes, path, onSuccess, onFailed);
   }
@@ -462,6 +466,9 @@ TorrentManager::download_file_manifest(const Name&              manifestName,
 {
   shared_ptr<Name> searchRes = findManifestSegmentToDownload(manifestName);
   auto packetNames = make_shared<std::vector<Name>>();
+  if (m_updateHandler->needsUpdate() && !(m_updateHandler->getOwnRoutablePrefix().empty())) {
+    m_updateHandler->sendAliveInterest(m_stats_table_iter);
+  }
   if (searchRes == nullptr) {
     this->findDataPacketsToDownload(manifestName, *packetNames);
     onSuccess(*packetNames);
@@ -812,18 +819,64 @@ TorrentManager::createInterest(Name name)
 }
 
 void
+TorrentManager::nackCallBack(const Interest& i, const lp::Nack& n) {
+  LOG_DEBUG << "Nack received: " << n.getReason() << ": " << i << std::endl;
+  auto it = m_pendingInterests.find(i.getName());
+  Name routablePrefix = (i.getForwardingHint().begin())->name;
+  if (m_stats_table_iter->getRecordName() == routablePrefix) {
+    m_stats_table_iter++;
+    if (m_stats_table_iter == m_statsTable.end()) {
+      m_stats_table_iter = m_statsTable.begin();
+    }
+  }
+  Interest newInterest(i);
+  m_stats_table_iter->incrementSentInterests();
+
+  // Create and set the forwarding hint
+  Delegation del;
+  del.preference = 1;
+  del.name = m_stats_table_iter->getRecordName();
+  DelegationList list({del});
+
+  if (m_updateHandler->needsUpdate()) {
+    m_updateHandler->sendAliveInterest(m_stats_table_iter);
+  }
+
+  newInterest.setForwardingHint(list);
+  LOG_DEBUG << "Resending Interest with LINK: " << m_stats_table_iter->getRecordName()
+            << std::endl;
+
+  m_face->expressInterest(newInterest, std::get<0>(it->second),
+                          std::bind(&TorrentManager::nackCallBack, this, _1, _2),
+                          std::get<1>(it->second));
+ }
+
+void
 TorrentManager::sendInterest()
 {
-  // auto nackCallBack = [](const Interest& i, const lp::Nack& n) {
-  //   LOG_ERROR << "Nack received: " << n.getReason() << ": " << i << std::endl;
-  //  };
   while (m_pendingInterests.size() < WINDOW_SIZE && !m_interestQueue->empty()) {
     queueTuple tup = m_interestQueue->pop();
-    m_pendingInterests.insert(std::get<0>(tup)->getName());
+    m_pendingInterests.insert({std::get<0>(tup)->getName(), std::make_tuple(std::get<1>(tup),
+                               std::get<2>(tup))});
     LOG_DEBUG << "Sending: " <<  *(std::get<0>(tup)) << std::endl;
-    // TODO (Spyros): For now, do nothing in case of NACKs
-    m_face->expressInterest(*std::get<0>(tup), std::get<1>(tup), nullptr, std::get<2>(tup));
+    m_face->expressInterest(*std::get<0>(tup), std::get<1>(tup),
+                            std::bind(&TorrentManager::nackCallBack, this, _1, _2),
+                            std::get<2>(tup));
   }
+}
+
+void
+TorrentManager::eraseOwnRoutablePrefix()
+{
+  Name ownRoutablePrefix = m_updateHandler->getOwnRoutablePrefix();
+  if (m_statsTable.find(ownRoutablePrefix) != m_statsTable.end()) {
+    LOG_DEBUG << "Erasing own routable prefix from StatsTable: " << ownRoutablePrefix
+              << std::endl;
+    std::cout << m_statsTable.erase(ownRoutablePrefix) << std::endl;
+  }
+  m_stats_table_iter = m_statsTable.begin();
+  std::cout << m_statsTable.size() << std::endl;
+  m_retries = 0;
 }
 
 }  // end ntorrent

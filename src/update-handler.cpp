@@ -22,6 +22,8 @@
 #include "update-handler.hpp"
 #include "util/logging.hpp"
 
+#include <boost/asio/io_service.hpp>
+
 #include <ndn-cxx/security/signing-helpers.hpp>
 
 namespace ndn {
@@ -32,7 +34,7 @@ UpdateHandler::sendAliveInterest(StatsTable::iterator iter)
 {
   Name prependedComponents(SharedConstants::commonPrefix);
   Name interestName = Name(prependedComponents.toUri() + "/NTORRENT" + m_torrentName.toUri() +
-                           "/ALIVE" + m_ownRoutablePrefix.toUri());
+                          "/ALIVE" + m_ownRoutablePrefix.toUri());
 
   shared_ptr<Interest> i = make_shared<Interest>(interestName);
 
@@ -40,12 +42,12 @@ UpdateHandler::sendAliveInterest(StatsTable::iterator iter)
   Delegation del;
   del.preference = 1;
   del.name = iter->getRecordName();
-
   DelegationList list({del});
 
   i->setForwardingHint(list);
+  i->setMustBeFresh(true);
 
-  LOG_DEBUG << "Sending ALIVE Interest: " << i << std::endl;
+  LOG_DEBUG << "Sending ALIVE Interest: " << *i << std::endl;
 
   m_face->expressInterest(*i, bind(&UpdateHandler::decodeDataPacketContent, this, _1, _2),
                           bind(&UpdateHandler::tryNextRoutablePrefix, this, _1),
@@ -71,6 +73,7 @@ UpdateHandler::createDataPacket(const Name& name)
   encodeContent(buffer);
 
   data->setContentType(tlv::ContentType_Blob);
+  data->setFreshnessPeriod(time::milliseconds(100));
   data->setContent(buffer.block());
 
   return data;
@@ -126,9 +129,10 @@ UpdateHandler::decodeDataPacketContent(const Interest& interest, const Data& dat
     element->parse();
     Name name(*element);
     if (name.empty()) {
-      BOOST_THROW_EXCEPTION(Error("Empty routable name was received"));
+      //BOOST_THROW_EXCEPTION(Error("Empty routable name was received"));
+      continue;
     }
-    if (m_statsTable->find(name) == m_statsTable->end()) {
+    if (m_statsTable->find(name) == m_statsTable->end() && name != m_ownRoutablePrefix) {
       m_statsTable->insert(name);
     }
   }
@@ -149,13 +153,14 @@ UpdateHandler::needsUpdate()
 }
 
 void
-UpdateHandler::learnOwnRoutablePrefix(OnOwnRoutablePrefixFailed onOwnRoutablePrefixFailed)
+UpdateHandler::learnOwnRoutablePrefix(OnReceivedOwnRoutablePrefix onReceivedOwnRoutablePrefix)
 {
   Interest i(Name("/localhop/nfd/rib/routable-prefixes"));
-  i.setInterestLifetime(time::milliseconds(100));
+  i.setInterestLifetime(time::milliseconds(1000));
 
   // parse the first contained routable prefix and set it as the ownRoutablePrefix
-  auto prefixReceived = [this] (const Interest& interest, const Data& data) {
+  auto prefixReceived = [this, onReceivedOwnRoutablePrefix] (const Interest& interest,
+                                                             const Data& data) {
     const Block& content = data.getContent();
     content.parse();
 
@@ -164,17 +169,26 @@ UpdateHandler::learnOwnRoutablePrefix(OnOwnRoutablePrefixFailed onOwnRoutablePre
     Name ownRoutablePrefix(*element);
     m_ownRoutablePrefix = ownRoutablePrefix;
     LOG_DEBUG << "Own routable prefix received: " << m_ownRoutablePrefix << std::endl;
+
+    Name prependedComponents(SharedConstants::commonPrefix);
+    m_face->setInterestFilter(Name(prependedComponents.toUri() + "/NTORRENT" + m_torrentName.toUri() +
+                              "/ALIVE"),
+                              bind(&UpdateHandler::onInterestReceived, this, _1, _2),
+                              RegisterPrefixSuccessCallback(),
+                              bind(&UpdateHandler::onRegisterFailed, this, _1, _2));
+
+    onReceivedOwnRoutablePrefix();
   };
 
-  auto prefixRetrievalFailed = [this, onOwnRoutablePrefixFailed] (const Interest&) {
+  auto prefixRetrievalFailed = [this, onReceivedOwnRoutablePrefix] (const Interest&) {
     ++m_ownRoutablPrefixRetries;
     LOG_ERROR << "Own Routable Prefix Retrieval Failed. Trying again." << std::endl;
     // If we fail, we will retry OWN_ROUTABLE_PREFIX_RETRIES times
     if (m_ownRoutablPrefixRetries < OWN_ROUTABLE_PREFIX_RETRIES) {
-      this->learnOwnRoutablePrefix(onOwnRoutablePrefixFailed);
+      this->learnOwnRoutablePrefix(onReceivedOwnRoutablePrefix);
     }
     else {
-      onOwnRoutablePrefixFailed();
+      m_face->getIoService().stop();
     }
   };
 
