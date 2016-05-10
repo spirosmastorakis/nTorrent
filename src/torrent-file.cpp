@@ -20,6 +20,7 @@
 */
 
 #include "torrent-file.hpp"
+#include "util/io-util.hpp"
 
 #include <ndn-cxx/security/key-chain.hpp>
 #include <ndn-cxx/security/signing-helpers.hpp>
@@ -28,12 +29,10 @@
 
 #include <boost/range/adaptors.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
 
 namespace fs = boost::filesystem;
 
 namespace ndn {
-
 namespace ntorrent {
 
 BOOST_CONCEPT_ASSERT((WireEncodable<TorrentFile>));
@@ -245,12 +244,12 @@ TorrentFile::generate(const std::string& directoryPath,
   std::vector<TorrentFile> torrentSegments;
 
   fs::path path(directoryPath);
-  if (!fs::exists(path)) {
+  if (!Io::exists(path)) {
     BOOST_THROW_EXCEPTION(Error(directoryPath + ": no such directory."));
   }
 
   Name directoryPathName(directoryPath);
-  fs::recursive_directory_iterator directoryPtr(fs::system_complete(directoryPath).string());
+  Io::recursive_directory_iterator directoryPtr(fs::system_complete(directoryPath).string());
 
   std::string prefix = std::string(SharedConstants::commonPrefix) + "/NTORRENT";
   Name commonPrefix(prefix +
@@ -261,7 +260,7 @@ TorrentFile::generate(const std::string& directoryPath,
   std::vector<std::pair<std::vector<FileManifest>, std::vector<Data>>> manifestPairs;
   // sort all the file names lexicographically
   std::set<std::string> fileNames;
-  for (auto i = directoryPtr; i != fs::recursive_directory_iterator(); ++i) {
+  for (auto i = directoryPtr; i != Io::recursive_directory_iterator(); ++i) {
     fileNames.insert(i->path().string());
   }
   size_t manifestFileCounter = 0u;

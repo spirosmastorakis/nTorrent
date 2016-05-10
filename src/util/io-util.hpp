@@ -23,7 +23,6 @@
 #define INCLUDED_UTIL_IO_UTIL_H
 
 #include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
 
 #include <ndn-cxx/data.hpp>
 #include <ndn-cxx/name.hpp>
@@ -33,10 +32,11 @@
 #include <string>
 #include <vector>
 
-namespace fs = boost::filesystem;
-
 namespace ndn {
 namespace ntorrent {
+
+// Import the boost;:filesystem namespace
+namespace Io = boost::filesystem;
 
 class TorrentFile;
 class FileManifest;
@@ -59,8 +59,15 @@ class IoUtil {
   load_directory(const std::string& dirPath,
                  ndn::io::IoEncoding encoding = ndn::io::IoEncoding::BASE64);
 
+  /*
+   * @brief create all directories for the @p dirPath.
+   * @param dirPath a path to a directory
+   */
+  static bool create_directories(const boost::filesystem::path& dirPath);
+
+
   static std::vector<ndn::Data>
-  packetize_file(const fs::path& filePath,
+  packetize_file(const boost::filesystem::path& filePath,
                  const ndn::Name& commonPrefix,
                  size_t dataPacketSize,
                  size_t subManifestSize,
@@ -92,7 +99,7 @@ class IoUtil {
   /*
    * @brief Write @p packet composed of torrent date to disk.
    * @param packet The data packet to be written to the disk
-   * @param os The output stream to which to write
+   * @param filePath The path to the file on disk to which we should write the Data
    * Write the Data packet to disk, return 'true' if data successfully written to disk 'false'
    * otherwise. Behavior is undefined unless the corresponding file manifest has already been
    * downloaded.
@@ -101,14 +108,14 @@ class IoUtil {
   writeData(const Data&         packet,
             const FileManifest& manifest,
             size_t              subManifestSize,
-            fs::fstream&        os);
+            const std::string&  filePath);
 
   /*
    * @brief Read a data packet from the provided stream
    * @param packetFullName The fullname of the expected Data packet
    * @param manifest The file manifest for the requested  Data packet
    * @param subManifestSize The number of Data packets in each catalog for this Data packet
-   * @param is The stream from which to read the  packet
+   * @param filePath The path on disk to the file containing the requested data
    * Read the data  packet from the @p is stream, validate it against the provided @p packetFullName
    * and @p manifest, if successful return a pointer to the packet, otherwise return nullptr.
    */
@@ -116,7 +123,7 @@ class IoUtil {
   readDataPacket(const Name&         packetFullName,
                  const FileManifest& manifest,
                  size_t              subManifestSize,
-                 fs::fstream&        is);
+                 const std::string&  filePath);
 
   /*
    * @brief Return the type of the specified name
@@ -126,15 +133,22 @@ class IoUtil {
 
 };
 
+
+inline
+bool
+IoUtil::create_directories(const boost::filesystem::path& dirPath) {
+  return boost::filesystem::create_directories(dirPath);
+}
+
 template<typename T>
 inline std::vector<T>
 IoUtil::load_directory(const std::string& dirPath,
                        ndn::io::IoEncoding encoding) {
   std::vector<T> structures;
   std::set<std::string> fileNames;
-  if (fs::exists(dirPath)) {
-    for(fs::recursive_directory_iterator it(dirPath);
-      it !=  fs::recursive_directory_iterator();
+  if (Io::exists(dirPath)) {
+    for(Io::recursive_directory_iterator it(dirPath);
+      it !=  Io::recursive_directory_iterator();
       ++it)
     {
       fileNames.insert(it->path().string());

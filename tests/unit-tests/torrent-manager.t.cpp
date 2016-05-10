@@ -21,14 +21,17 @@
 
 #include "boost-test.hpp"
 
-#include "dummy-parser-fixture.hpp"
 #include "torrent-manager.hpp"
+
+#include "dummy-parser-fixture.hpp"
 #include "torrent-file.hpp"
 #include "unit-test-time-fixture.hpp"
+#include "util/io-util.hpp"
 
 #include <set>
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 
 #include <ndn-cxx/util/dummy-client-face.hpp>
 #include <ndn-cxx/util/io.hpp>
@@ -79,18 +82,13 @@ public:
   }
 
   std::vector<bool> fileState(const ndn::Name& manifestName) {
-    auto fout = m_fileStates[manifestName].first;
-    if (nullptr != fout) {
-      fout->flush();
-    }
-    return m_fileStates[manifestName].second;
+    return m_fileStates[manifestName];
   }
 
   void setFileState(const ndn::Name manifestName,
-                    std::shared_ptr<fs::fstream> f,
                     const std::vector<bool>& stateVec) {
 
-    m_fileStates.insert({ manifestName, std::make_pair(f, stateVec) });
+    m_fileStates[manifestName] = stateVec;
   }
 
   bool writeData(const Data& data) {
@@ -760,13 +758,13 @@ BOOST_AUTO_TEST_CASE(TestFindManifestSegmentToDownload2)
 
   // Set the file state
   std::vector<bool> v1 = {true};
-  manager.setFileState(manifests[0].getFullName(), make_shared<fs::fstream>(), v1);
+  manager.setFileState(manifests[0].getFullName(), v1);
 
   std::vector<bool> v2 = {false, true, true, false, false, false};
-  manager.setFileState(manifests[1].getFullName(), make_shared<fs::fstream>(), v2);
+  manager.setFileState(manifests[1].getFullName(), v2);
 
   std::vector<bool> v3 = {true, false, false, false, false, false};
-  manager.setFileState(manifests[2].getFullName(), make_shared<fs::fstream>(), v3);
+  manager.setFileState(manifests[2].getFullName(), v3);
 
   manager.download_file_manifest(manifests[0].getFullName(), filePath + "manifests",
                                 [&manifests](const std::vector<ndn::Name>& vec) {
@@ -864,13 +862,13 @@ BOOST_AUTO_TEST_CASE(TestDataAlreadyDownloaded)
 
   // Set the file state
   std::vector<bool> v1 = {true};
-  manager.setFileState(manifests[0].getFullName(), make_shared<fs::fstream>(), v1);
+  manager.setFileState(manifests[0].getFullName(), v1);
 
   std::vector<bool> v2 = {false, true, true, false, false, false};
-  manager.setFileState(manifests[1].getFullName(), make_shared<fs::fstream>(), v2);
+  manager.setFileState(manifests[1].getFullName(), v2);
 
   std::vector<bool> v3 = {true, false, false, false, false, false};
-  manager.setFileState(manifests[2].getFullName(), make_shared<fs::fstream>(), v3);
+  manager.setFileState(manifests[2].getFullName(), v3);
 
   Name p1("/ndn/multicast/NTORRENT/foo/bar1.txt");
   p1.appendSequenceNumber(0);

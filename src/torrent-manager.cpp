@@ -26,8 +26,8 @@
 #include "util/io-util.hpp"
 #include "util/logging.hpp"
 
+#include <boost/asio/io_service.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
 
 #include <ndn-cxx/data.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
@@ -38,7 +38,6 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include <boost/asio/io_service.hpp>
 
 namespace fs = boost::filesystem;
 
@@ -152,31 +151,13 @@ initializeDataPackets(const string&      filePath,
   return packets;
 }
 
-static std::pair<std::shared_ptr<fs::fstream>, std::vector<bool>>
+static std::vector<bool>
 initializeFileState(const string&       dataPath,
                     const FileManifest& manifest,
                     size_t              subManifestSize)
 {
   // construct the file name
-  auto fileName = manifest.file_name();
-  auto filePath = dataPath + fileName;
-  vector<bool> fileBitMap(manifest.catalog().size());
-  // if the file does not exist, create an empty placeholder (otherwise cannot set read-bit)
-  if (!fs::exists(filePath)) {
-    fs::ofstream fs(filePath);
-    fs << "";
-  }
-  auto s = std::make_shared<fs::fstream>(filePath,
-                                           fs::fstream::out
-                                         | fs::fstream::binary
-                                         | fs::fstream::in);
-  if (!*s) {
-    BOOST_THROW_EXCEPTION(io::Error("Cannot open: " + filePath));
-  }
-  auto start_offset = manifest.submanifest_number() * subManifestSize * manifest.data_packet_size();
-  s->seekg(start_offset);
-  s->seekp(start_offset);
-  return std::make_pair(s, fileBitMap);
+  return vector<bool>(manifest.catalog().size());
 }
 
 //==================================================================================================
@@ -199,7 +180,7 @@ void TorrentManager::Initialize()
 
   // TODO(spyros) Get update manager working
   // m_updateHandler = make_shared<UpdateHandler>(torrentName, m_keyChain,
-  //                                              make_shared<StatsTable>(m_statsTable), m_face);
+  //                                               make_shared<StatsTable>(m_statsTable), m_face);
 
   // .../<torrent_name>/torrent-file/<implicit_digest>
   string dataPath = ".appdata/" + m_torrentFileName.get(-3).toUri();
@@ -207,7 +188,7 @@ void TorrentManager::Initialize()
   string torrentFilePath = dataPath +"/torrent_files";
 
   // get the torrent file segments and manifests that we have.
-  if (!fs::exists(torrentFilePath)) {
+  if (!Io::exists(torrentFilePath)) {
     return;
   }
   m_torrentSegments = intializeTorrentSegments(torrentFilePath, m_torrentFileName);
@@ -228,19 +209,20 @@ void TorrentManager::Initialize()
     // construct the file name
     auto fileName = m.file_name();
     fs::path filePath = m_dataPath + fileName;
-    // If there are any valid packets, add corresponding state to manager
-    if (!fs::exists(filePath)) {
-      if (!fs::exists(filePath.parent_path())) {
-        boost::filesystem::create_directories(filePath.parent_path());
+
+    if (!Io::exists(filePath)) {
+      if (!Io::exists(filePath.parent_path())) {
+        IoUtil::create_directories(filePath.parent_path());
       }
       continue;
     }
     auto packets = initializeDataPackets(filePath.string(), m, m_subManifestSizes[m.file_name()]);
+    // If there are any valid packets, add corresponding state to manager
     if (!packets.empty()) {
       m_fileStates[m.getFullName()] = initializeFileState(m_dataPath,
                                                           m,
                                                           m_subManifestSizes[m.file_name()]);
-      auto& fileBitMap = m_fileStates[m.getFullName()].second;
+      auto& fileBitMap = m_fileStates[m.getFullName()];
       auto read_it = packets.begin();
       size_t i = 0;
       for (auto name : m.catalog()) {
@@ -334,14 +316,13 @@ TorrentManager::hasDataPacket(const Name& dataName) const
     return false;
   }
 
-  // find the pair of (std::shared_ptr<fs::fstream>, std::vector<bool>)
   // that corresponds to the specific submanifest
   auto fileState_it = m_fileStates.find(manifest_it->getFullName());
   if (m_fileStates.end() != fileState_it) {
     const auto& fileState = fileState_it->second;
     auto dataNum = dataName.get(dataName.size() - 2).toSequenceNumber();
     // find whether we have the requested packet from the bitmap
-    return fileState.second[dataNum];
+    return fileState[dataNum];
   }
   return false;
 }
@@ -358,7 +339,7 @@ TorrentManager::findDataPacketsToDownload(const Name& manifestName, std::vector<
   for (auto j = manifest_it; j != m_fileManifests.end(); j++) {
     auto& fileState = m_fileStates[j->getFullName()];
     for (size_t dataNum = 0; dataNum < j->catalog().size(); ++dataNum) {
-      if (!fileState.second[dataNum]) {
+      if (!fileState[dataNum]) {
         packetNames.push_back(j->catalog()[dataNum]);
       }
     }
@@ -385,7 +366,7 @@ TorrentManager::findAllMissingDataPackets(std::vector<Name>& packetNames) const
       const auto &fileState =  fileState_it->second;
       for (auto i = j->catalog().begin(); i != j->catalog().end(); i++) {
         auto dataNum = i->get(i->size() - 2).toSequenceNumber();
-        if (!fileState.second[dataNum]) {
+        if (!fileState[dataNum]) {
           packetNames.push_back(*i);
         }
       }
@@ -590,32 +571,33 @@ bool TorrentManager::writeData(const Data& packet)
     return false;
   }
   // get file state out
-  auto& fileState = m_fileStates[manifest_it->getFullName()];
-
+  auto fileState_it = m_fileStates.find(manifest_it->getFullName());
   // if there is no open stream to the file
-  if (nullptr == fileState.first) {
+  if(fileState_it == m_fileStates.end()) {
     fs::path filePath = m_dataPath + manifest_it->file_name();
-    if (!fs::exists(filePath)) {
-      fs::create_directories(filePath.parent_path());
+    if (!Io::exists(filePath)) {
+      IoUtil::create_directories(filePath.parent_path());
     }
-    fileState = initializeFileState(m_dataPath,
+    m_fileStates[manifest_it->getFullName()] =
+                initializeFileState(m_dataPath,
                                     *manifest_it,
                                     m_subManifestSizes[manifest_it->file_name()]);
   }
+  auto& fileState = m_fileStates[manifest_it->getFullName()];
   auto packetNum = packetName.get(packetName.size() - 1).toSequenceNumber();
   // if we already have the packet, do not rewrite it.
-  if (fileState.second[packetNum]) {
+  if (fileState[packetNum]) {
     return false;
   }
   // write data to disk
-  // TODO(msweatt) Fix this once code is merged
   auto subManifestSize = m_subManifestSizes[manifest_it->file_name()];
-  if (IoUtil::writeData(packet, *manifest_it, subManifestSize, *fileState.first)) {
-    fileState.first->flush();
+  auto filePath = m_dataPath + manifest_it->file_name();
+  if (IoUtil::writeData(packet, *manifest_it, subManifestSize, filePath)) {;
     // update bitmap
-    fileState.second[packetNum] = true;
+    fileState[packetNum] = true;
     return true;
   }
+  LOG_ERROR << "Write failed: " << packet.getFullName() << std::endl;
   return false;
 }
 
@@ -748,15 +730,15 @@ TorrentManager::onInterestReceived(const InterestFilter& filter, const Interest&
       auto manifestName = interestName.getSubName(0, interestName.size() - 2);
       auto map_it = std::find_if(m_fileStates.begin(), m_fileStates.end(),
                                        [&manifestName](const std::pair<Name,
-                                                          std::pair<std::shared_ptr<fs::fstream>,
-                                                                    std::vector<bool>>>& kv){
-                                        return manifestName.isPrefixOf(kv.first);
+                                                                       std::vector<bool>>& kv){
+                                        return manifestName.isPrefixOf(kv.first
+                                          );
                                       });
       if (m_fileStates.end() != map_it) {
         auto packetName = interestName.getSubName(0, interestName.size() - 1);
         // get out the bitmap to be sure we have the packet
         auto& fileState = map_it->second;
-        const auto &bitmap = fileState.second;
+        const auto &bitmap = fileState;
         auto packetNum = packetName.get(packetName.size() - 1).toSequenceNumber();
         if (bitmap[packetNum]) {
           // get the manifest
@@ -766,12 +748,10 @@ TorrentManager::onInterestReceived(const InterestFilter& filter, const Interest&
                                           });
           auto manifestFileName = manifest_it->file_name();
           auto filePath = m_dataPath + manifestFileName;
-          // TODO(msweatt) Explore why fileState stream does not work
-          fs::fstream is (filePath, fs::fstream::in | fs::fstream::binary);
           data = IoUtil::readDataPacket(interestName,
                                         *manifest_it,
                                         m_subManifestSizes[manifestFileName],
-                                        is);
+                                        filePath);
         }
       }
     }

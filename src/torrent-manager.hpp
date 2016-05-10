@@ -34,16 +34,12 @@
 #include <ndn-cxx/name.hpp>
 #include <ndn-cxx/security/key-chain.hpp>
 
-#include <boost/filesystem/fstream.hpp>
-
 #include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-namespace fs = boost::filesystem;
 
 namespace ndn {
 namespace ntorrent {
@@ -313,11 +309,8 @@ class TorrentManager : noncopyable {
   onRegisterFailed(const Name& prefix, const std::string& reason);
 
 protected:
-  // A map from each fileManifest to corresponding file stream on disk and a bitmap of which Data
-  // packets this manager currently has
-  mutable std::unordered_map<Name,
-                             std::pair<std::shared_ptr<fs::fstream>,
-                                       std::vector<bool>>>            m_fileStates;
+  // A map from each fileManifest a bitmap of which Data packets this manager currently has
+  mutable std::unordered_map<Name, std::vector<bool>>                 m_fileStates;
   // A map for each initial manifest to the size for the sub-manifest
   std::unordered_map<std::string, size_t>                             m_subManifestSizes;
   // The segments of the TorrentFile this manager has
@@ -335,7 +328,6 @@ private:
 
   void
   sendInterest();
-
 
   // A flag to determine if upon completion we should continue seeding
   bool                                                                m_seedFlag;

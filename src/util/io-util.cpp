@@ -154,8 +154,12 @@ bool IoUtil::writeFileManifest(const FileManifest& manifest, const std::string& 
   return true;
 }
 bool
-IoUtil::writeData(const Data& packet, const FileManifest& manifest, size_t subManifestSize, fs::fstream& os)
+IoUtil::writeData(const Data&         packet,
+                  const FileManifest& manifest,
+                  size_t              subManifestSize,
+                  const std::string&  filePath)
 {
+  fs::ofstream os (filePath, fs::ofstream::binary | fs::ofstream::out | fs::ofstream::app);
   auto packetName = packet.getName();
   auto packetNum = packetName.get(packetName.size() - 1).toSequenceNumber();
   auto dataPacketSize = manifest.data_packet_size();
@@ -166,8 +170,7 @@ IoUtil::writeData(const Data& packet, const FileManifest& manifest, size_t subMa
   try {
     auto content = packet.getContent();
     std::vector<char> data(content.value_begin(), content.value_end());
-    os.write(&data[0], data.size());
-    return true;
+    return os.write(&data[0], data.size()).good() && os.flush().good();
   }
   catch (io::Error &e) {
     LOG_ERROR << e.what() << std::endl;
@@ -176,11 +179,12 @@ IoUtil::writeData(const Data& packet, const FileManifest& manifest, size_t subMa
 }
 
 std::shared_ptr<Data>
-IoUtil::readDataPacket(const Name& packetFullName,
+IoUtil::readDataPacket(const Name&         packetFullName,
                        const FileManifest& manifest,
-                       size_t subManifestSize,
-                       fs::fstream& is)
+                       size_t              subManifestSize,
+                       const std::string&  filePath)
 {
+  fs::fstream is (filePath, fs::fstream::in | fs::fstream::binary);
   auto dataPacketSize = manifest.data_packet_size();
   auto start_offset = manifest.submanifest_number() * subManifestSize * dataPacketSize;
   auto packetNum = packetFullName.get(packetFullName.size() - 2).toSequenceNumber();

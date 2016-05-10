@@ -33,6 +33,7 @@
 #include <boost/program_options/errors.hpp>
 #include <boost/log/utility/setup/common_attributes.hpp>
 
+namespace fs = boost::filesystem;
 namespace logging = boost::log;
 namespace po = boost::program_options;
 

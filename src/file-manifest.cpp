@@ -26,7 +26,6 @@
 
 #include <boost/assert.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/range/adaptors.hpp>
 #include <boost/range/irange.hpp>
@@ -85,10 +84,10 @@ FileManifest::generate(const std::string& filePath,
   BOOST_ASSERT(0 < dataPacketSize);
   std::vector<FileManifest> manifests;
   fs::path path(filePath);
-  if (!fs::exists(path)) {
+  if (!Io::exists(path)) {
     BOOST_THROW_EXCEPTION(Error(filePath + ": no such file."));
   }
-  size_t file_length = fs::file_size(filePath);
+  size_t file_length = Io::file_size(filePath);
   // If the file_length is not evenly divisible by subManifestSize add 1, otherwise 0
   size_t numSubManifests = file_length / (subManifestSize * dataPacketSize) +
                               !!(file_length % (subManifestSize * dataPacketSize));
