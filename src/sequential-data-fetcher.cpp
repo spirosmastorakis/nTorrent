@@ -98,13 +98,6 @@ SequentialDataFetcher::downloadPackets(const std::vector<ndn::Name>& packetsName
 
 void
 SequentialDataFetcher::implementSequentialLogic() {
-  // TODO(?) Fix seeding, and implement windowing:
-  /*
-  Alex says look at ndn-cxx:
-  * fetcher with queue (with window)
-  * segment fetcher ?
-  * catchunks (pipeline?)
-  */
   if (!m_manager->hasAllTorrentSegments()) {
     this->downloadTorrentFile();
   }
