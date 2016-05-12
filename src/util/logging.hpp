@@ -50,7 +50,7 @@ namespace log = boost::log::trivial;
 struct LoggingUtil {
   static log::severity_level severity_threshold;
 
-  static void init();
+  static void init(bool log_to_console = false);
   // Initialize the log for the application. THis method must be called in the main function in
   // the application before any logging may be performed.
 };

@@ -30,6 +30,7 @@
 #include <boost/log/sources/severity_logger.hpp>
 #include <boost/log/support/date_time.hpp>
 #include <boost/log/trivial.hpp>
+#include <boost/log/utility/setup/console.hpp>
 #include <boost/log/utility/setup/file.hpp>
 
 // ===== log macros =====
@@ -44,27 +45,49 @@ namespace ntorrent {
 
 log::severity_level LoggingUtil::severity_threshold = log::info;
 
-void LoggingUtil::init()
+void LoggingUtil::init(bool log_to_console)
 {
+  // set logging level
   logging::core::get()->set_filter
   (
       logging::trivial::severity >= severity_threshold
   );
 
-  logging::add_file_log
-  (
+  boost::shared_ptr< logging::core > core = logging::core::get();
+
+  auto backend =
+    boost::make_shared< sinks::text_file_backend >(
      keywords::file_name = "sample_%N.log",                                        // < file name pattern >
      keywords::rotation_size = 10 * 1024 * 1024,                                   // < rotate files every 10 MiB... >
-     keywords::time_based_rotation = sinks::file::rotation_at_time_point(0, 0, 0), // < ...or at midnight >
-     keywords::format =                                                            // < log record format >
-     (
-       expr::stream
-           << expr::attr< unsigned int >("LineID")
-           << ": [" << expr::format_date_time< boost::posix_time::ptime >("TimeStamp", "%Y-%m-%d %H:%M:%S") << "]"
-           << ": <" << logging::trivial::severity
-           << "> " << expr::smessage
-    )
+     keywords::time_based_rotation = sinks::file::rotation_at_time_point(0, 0, 0) // < ...or at midnight >
   );
+   // Enable auto-flushing after each log record written
+  backend->auto_flush(true);
+
+  // Wrap it into the frontend and register in the core.
+  // The backend requires synchronization in the frontend.
+  typedef sinks::synchronous_sink< sinks::text_file_backend > sink_t;
+  boost::shared_ptr< sink_t > sink(new sink_t(backend));
+  sink->set_formatter(
+   expr::stream
+             << expr::attr< unsigned int >("LineID")
+             << ": [" << expr::format_date_time< boost::posix_time::ptime >("TimeStamp", "%Y-%m-%d %H:%M:%S") << "]"
+             << ": <" << logging::trivial::severity
+             << "> " << expr::smessage
+  );
+  core->add_sink(sink);
+
+  if (log_to_console) {
+    logging::add_console_log(std::cerr,
+                             keywords::format =
+      (
+        expr::stream
+             << "[" << expr::format_date_time< boost::posix_time::ptime >("TimeStamp", "%Y-%m-%d %H:%M:%S") << "]"
+             << ": <" << logging::trivial::severity
+             << "> " << expr::smessage
+      )
+    );
+  }
 }
 
 } // end ntorrent

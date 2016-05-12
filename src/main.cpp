@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
       ("generate,g" , "-g <data directory> <output-path>? <names-per-segment>? <names-per-manifest-segment>? <data-packet-size>?")
       ("seed,s", "After download completes, continue to seed")
       ("dump,d", "-d <file> Dump the contents of the Data stored at the <file>.")
-      ("log-level", po::value<std::string>(), "trace | debug | info | warming | error | fatal")
+      ("log-level", po::value<std::string>(), "trace | debug | info | warming | error | fatal | console")
       ("args", po::value<std::vector<std::string> >(), "For arguments you want to specify without flags")
     ;
     po::positional_options_description p;
@@ -85,25 +85,28 @@ int main(int argc, char *argv[])
         std::cout << desc << std::endl;
         return 1;
     }
+    bool log_to_console = false;
     if (vm.count("log-level")) {
     std::unordered_map<std::string, log::severity_level> supported_levels = {
-        {"trace"   , log::severity_level::trace},
+        { "trace"  , log::severity_level::trace},
         { "debug"  , log::severity_level::debug},
         { "info"   , log::severity_level::info},
         { "warning", log::severity_level::warning},
         { "error"  , log::severity_level::error},
-        { "fatal"  , log::severity_level::fatal}
+        { "fatal"  , log::severity_level::fatal},
+        { "console", log::severity_level::trace}
       };
       auto log_str = vm["log-level"].as<std::string>();
       if (supported_levels.count(log_str)) {
         LoggingUtil::severity_threshold  = supported_levels[log_str];
+        log_to_console = ("console" == log_str);
       }
       else {
         throw ndn::Error("Unsupported log level: " + log_str);
       }
     }
     // setup log
-    LoggingUtil::init();
+    LoggingUtil::init(log_to_console);
     logging::add_common_attributes();
 
     if (vm.count("args")) {
