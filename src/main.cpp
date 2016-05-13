@@ -53,7 +53,7 @@ public:
 
 namespace ntorrent {
 
-const char * SharedConstants::commonPrefix = "/ndn";
+const char * SharedConstants::commonPrefix = "/ndn/nTorrent";
 
 } // end ntorrent
 } // end ndn

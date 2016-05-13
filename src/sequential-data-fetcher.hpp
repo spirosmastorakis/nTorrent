@@ -27,6 +27,8 @@
 
 #include <ndn-cxx/name.hpp>
 
+#include <unordered_map>
+
 namespace ndn {
 namespace ntorrent {
 
@@ -97,6 +99,11 @@ class SequentialDataFetcher : FetchingStrategyManager {
     onTorrentFileSegmentReceived(const std::vector<Name>& manifestNames);
 
   private:
+    enum
+    {
+      MAX_RETRIES = 5
+    };
+    std::unordered_map<Name, int> m_retryMap;
     std::string m_dataPath;
     ndn::Name m_torrentFileName;
     shared_ptr<TorrentManager> m_manager;

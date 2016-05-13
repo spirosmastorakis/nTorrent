@@ -69,6 +69,10 @@ class FileManifest : public Data {
            size_t             subManifestSize,
            size_t             dataPacketSize,
            bool               returnData);
+
+  static
+  Name
+  manifestPrefix(const Name& manifestName);
   /**
    * \brief Generates the FileManifest(s) and Data packets for the file at the specified 'filePath'
    *
@@ -237,6 +241,12 @@ FileManifest::generate(const std::string& filePath,
                        size_t             dataPacketSize)
 {
   return generate(filePath, manifestPrefix, subManifestSize, dataPacketSize, false).first;
+}
+
+inline
+Name
+FileManifest::manifestPrefix(const Name& manifestName) {
+  return manifestName.getSubName(0, manifestName.size() - 2);
 }
 
 inline

@@ -136,6 +136,7 @@ SequentialDataFetcher::onDataPacketReceived(const ndn::Name& name)
 {
   // Data Packet Received
   LOG_INFO << "Data Packet Received: " << name;
+  m_retryMap.clear();
 }
 
 void
@@ -143,6 +144,7 @@ SequentialDataFetcher::onTorrentFileSegmentReceived(const std::vector<Name>& man
 {
   // TODO(msweatt) Add parameter for torrent file
   LOG_INFO << "Torrent Segment Received: " << m_torrentFileName << std::endl;
+  m_retryMap.clear();
   this->downloadManifestFiles(manifestNames);
 }
 
@@ -151,6 +153,7 @@ SequentialDataFetcher::onManifestReceived(const std::vector<Name>& packetNames)
 {
   LOG_INFO << "Manifest File Received: "
             << packetNames[0].getSubName(0, packetNames[0].size()- 3) << std::endl;
+  m_retryMap.clear();
   this->downloadPackets(packetNames);
 }
 
@@ -159,23 +162,30 @@ SequentialDataFetcher::onDataRetrievalFailure(const ndn::Name& name,
                                               const std::string& errorCode)
 {
   // Data retrieval failure
-  uint32_t nameType = IoUtil::findType(name);
-  if (nameType == IoUtil::TORRENT_FILE) {
-    // this should never happen
-    LOG_ERROR << "Torrent File Segment Downloading Failed: " << name;
-    this->downloadTorrentFile();
-  }
-  else if (nameType == IoUtil::FILE_MANIFEST) {
-    LOG_ERROR << "Manifest File Segment Downloading Failed: " << name;
-    this->downloadManifestFiles({ name });
-  }
-  else if (nameType == IoUtil::DATA_PACKET) {
-    LOG_ERROR << "Data Packet Downloading Failed: " << name;
-    this->downloadPackets({ name });
+  if (m_retryMap[name] < MAX_RETRIES) {
+    m_retryMap[name]++;
+    uint32_t nameType = IoUtil::findType(name);
+    if (nameType == IoUtil::TORRENT_FILE) {
+      // this should never happen
+      LOG_ERROR << "Torrent File Segment Downloading Failed: " << name;
+      this->downloadTorrentFile();
+    }
+    else if (nameType == IoUtil::FILE_MANIFEST) {
+      LOG_ERROR << "Manifest File Segment Downloading Failed: " << name;
+      this->downloadManifestFiles({ name });
+    }
+    else if (nameType == IoUtil::DATA_PACKET) {
+      LOG_ERROR << "Data Packet Downloading Failed: " << name;
+      this->downloadPackets({ name });
+    }
+    else {
+      // This should never happen
+      LOG_ERROR << "Unknown Packet Type Downloading Failed: " << name;
+    }
   }
   else {
-    // This should never happen
-    LOG_ERROR << "Unknown Packet Type Downloading Failed: " << name;
+    m_retryMap.erase(name);
+    LOG_INFO << "Giving up on " << name;
   }
 }
 

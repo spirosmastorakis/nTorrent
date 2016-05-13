@@ -281,7 +281,7 @@ shared_ptr<Name>
 TorrentManager::findManifestSegmentToDownload(const Name& manifestName) const
 {
   //sequentially find whether we have downloaded any segments of this manifest file
-  Name manifestPrefix = manifestName.getSubName(0, manifestName.size() - 2);
+  Name manifestPrefix = FileManifest::manifestPrefix(manifestName);
   auto it = std::find_if(m_fileManifests.rbegin(), m_fileManifests.rend(),
                       [&manifestPrefix] (const FileManifest& f) {
                         return manifestPrefix.isPrefixOf(f.getName());
@@ -426,7 +426,7 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
         this->downloadTorrentFileSegment(*nextSegmentPtr, path, onSuccess, onFailed);
       }
       this->sendInterest();
-      if (m_pendingInterests.empty() && m_interestQueue->empty() && !m_seedFlag) {
+      if (!hasPendingInterests() && !m_seedFlag) {
         shutdown();
       }
   };
@@ -441,11 +441,13 @@ TorrentManager::downloadTorrentFileSegment(const ndn::Name& name,
         m_stats_table_iter = m_statsTable.begin();
       }
     }
-    this->sendInterest();
     if (onFailed) {
       onFailed(interest.getName(), "Unknown error");
     }
-    this->downloadTorrentFileSegment(name, path, onSuccess, onFailed);
+    this->sendInterest();
+    if (!hasPendingInterests() && !m_seedFlag) {
+      shutdown();
+    }
   };
   LOG_DEBUG << "Pushing to the Interest Queue: " << *interest << std::endl;
   m_interestQueue->push(interest, dataReceived, dataFailed);
@@ -511,7 +513,7 @@ TorrentManager::download_data_packet(const Name& packetName,
     m_retries = 0;
     onSuccess(data.getName());
     this->sendInterest();
-    if (m_pendingInterests.empty() && m_interestQueue->empty() && !m_seedFlag) {
+    if (!hasPendingInterests() && !m_seedFlag) {
       shutdown();
     }
   };
@@ -528,6 +530,9 @@ TorrentManager::download_data_packet(const Name& packetName,
     }
     onFailed(interest.getName(), "Unknown failure");
     this->sendInterest();
+    if (!hasPendingInterests() && !m_seedFlag) {
+      shutdown();
+    }
   };
   LOG_DEBUG << "Pushing to the Interest Queue: " << *interest << std::endl;
   m_interestQueue->push(interest, dataReceived, dataFailed);
@@ -535,10 +540,32 @@ TorrentManager::download_data_packet(const Name& packetName,
 }
 
 void TorrentManager::seed(const Data& data) {
-  m_face->setInterestFilter(data.getFullName(),
-                           bind(&TorrentManager::onInterestReceived, this, _1, _2),
-                           RegisterPrefixSuccessCallback(),
-                           bind(&TorrentManager::onRegisterFailed, this, _1, _2));
+  auto dataName = data.getFullName();
+  std::shared_ptr<Name> prefix = nullptr;
+
+  switch (IoUtil::findType(dataName)) {
+    case IoUtil::NAME_TYPE::TORRENT_FILE: {
+      if (hasAllTorrentSegments()) {
+        prefix = std::make_shared<Name>(TorrentFile::torrentFileName(dataName));
+      }
+    } break;
+    case IoUtil::NAME_TYPE::FILE_MANIFEST: {
+      if (hasAllManifestSegments(dataName)) {
+        prefix = std::make_shared<Name>(FileManifest::manifestPrefix(dataName));
+      }
+    } break;
+    case IoUtil::NAME_TYPE::DATA_PACKET: /* we  already announced the prefix */
+    case IoUtil::NAME_TYPE::UNKNOWN: {
+    } break;
+    default:
+      break;
+  }
+  if (prefix) {
+    m_face->setInterestFilter(*prefix,
+                             bind(&TorrentManager::onInterestReceived, this, _1, _2),
+                             RegisterPrefixSuccessCallback(),
+                             bind(&TorrentManager::onRegisterFailed, this, _1, _2));
+  }
 }
 
 void
@@ -675,7 +702,7 @@ TorrentManager::downloadFileManifestSegment(const Name& manifestName,
       onSuccess(*packetNames);
     }
     this->sendInterest();
-    if (m_pendingInterests.empty() && m_interestQueue->empty() && !m_seedFlag) {
+    if (!hasPendingInterests() && !m_seedFlag) {
       shutdown();
     }
   };
@@ -773,6 +800,7 @@ TorrentManager::createInterest(Name name)
 {
   shared_ptr<Interest> interest = make_shared<Interest>(name);
   interest->setInterestLifetime(time::milliseconds(2000));
+  interest->setMustBeFresh(true);
 
   // Select routable prefix
   // TODO(spyros) Fix links
@@ -805,14 +833,15 @@ TorrentManager::createInterest(Name name)
 void
 TorrentManager::sendInterest()
 {
-  auto nackCallBack = [](const Interest& i, const lp::Nack& n) {
-    LOG_ERROR << "Nack received: " << n.getReason() << ": " << i << std::endl;
-   };
+  // auto nackCallBack = [](const Interest& i, const lp::Nack& n) {
+  //   LOG_ERROR << "Nack received: " << n.getReason() << ": " << i << std::endl;
+  //  };
   while (m_pendingInterests.size() < WINDOW_SIZE && !m_interestQueue->empty()) {
     queueTuple tup = m_interestQueue->pop();
     m_pendingInterests.insert(std::get<0>(tup)->getName());
     LOG_DEBUG << "Sending: " <<  *(std::get<0>(tup)) << std::endl;
-    m_face->expressInterest(*std::get<0>(tup), std::get<1>(tup), nackCallBack, std::get<2>(tup));
+    // TODO (Spyros): For now, do nothing in case of NACKs
+    m_face->expressInterest(*std::get<0>(tup), std::get<1>(tup), nullptr, std::get<2>(tup));
   }
 }
 

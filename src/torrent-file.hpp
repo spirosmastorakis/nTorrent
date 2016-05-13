@@ -45,6 +45,8 @@ public:
     {
     }
   };
+  static ndn::Name
+  torrentFileName(const Name& name);
 
   /**
    * @brief Create a new empty TorrentFile.
@@ -236,6 +238,14 @@ private:
   std::vector<ndn::Name> m_catalog;
 };
 
+inline
+ndn::Name
+TorrentFile::torrentFileName(const Name& name) {
+  return (name.get(name.size() - 2).isSequenceNumber())
+    ? name.getSubName(0, name.size() - 2)
+    : name.getSubName(0, name.size() - 1);
+}
+
 inline bool
 TorrentFile::hasTorrentFilePtr() const
 {
@@ -287,7 +297,8 @@ TorrentFile::getCommonPrefix() const
 inline std::string
 TorrentFile::getTorrentFilePath() const
 {
-  return (0 == getSegmentNumber() ? getFullName().get(-3) : getFullName().get(-4)).toUri();
+  Name commonPrefix(SharedConstants::commonPrefix);
+  return torrentFileName(getFullName()).get(commonPrefix.size() + 1).toUri();
 }
 
 inline size_t

@@ -91,6 +91,12 @@ class TorrentManager : noncopyable {
   hasAllTorrentSegments() const;
 
   /*
+   * @brief Return 'true' if all segments of this file manifest are downloaded, 'false' otherwise.
+   */
+  bool
+  hasAllManifestSegments(const Name& manifestName) const;
+
+  /*
    * \brief Given a data packet name, find whether we have already downloaded this packet
    * @param dataName The name of the data packet to download
    * @return True if we have already downloaded this packet, false otherwise
@@ -149,6 +155,9 @@ class TorrentManager : noncopyable {
    */
   void
   findAllMissingDataPackets(std::vector<Name>& packetNames) const;
+
+  bool
+  hasPendingInterests() const;
 
   /*
    * @brief Stop all network activities of this manager
@@ -392,6 +401,20 @@ bool
 TorrentManager::hasAllTorrentSegments() const
 {
   return findTorrentFileSegmentToDownload() == nullptr;
+}
+
+inline
+bool
+TorrentManager::hasAllManifestSegments(const Name& manifestName) const
+{
+  return nullptr == findManifestSegmentToDownload(manifestName);
+}
+
+inline
+bool
+TorrentManager::hasPendingInterests() const
+{
+  return !m_pendingInterests.empty() || !m_interestQueue->empty();
 }
 
 }  // end ntorrent

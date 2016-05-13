@@ -31,4 +31,4 @@ struct SharedConstants {
 } // namespace ntorrent
 } // namespace ndn
 
-#endif
+#endif // INCLUDED_SHARED_CONSTANTS_HPP
