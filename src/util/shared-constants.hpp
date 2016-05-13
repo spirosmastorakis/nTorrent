@@ -18,6 +18,8 @@
 *
 * See AUTHORS for complete list of nTorrent authors and contributors.
 */
+#ifndef INCLUDED_SHARED_CONSTANTS_HPP
+#define INCLUDED_SHARED_CONSTANTS_HPP
 
 namespace ndn {
 namespace ntorrent {
@@ -28,3 +30,5 @@ struct SharedConstants {
 
 } // namespace ntorrent
 } // namespace ndn
+
+#endif
