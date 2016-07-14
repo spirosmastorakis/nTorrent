@@ -59,8 +59,8 @@ class FaceFixture : public UnitTestTimeFixture
 public:
   explicit
   FaceFixture()
-  : face1(util::makeDummyClientFace(io, { true, true }))
-  , face2(util::makeDummyClientFace(io, { true, true }))
+  : face1(new DummyClientFace(io, {true, true}))
+  , face2(new DummyClientFace(io, {true, true}))
   {
   }
 
