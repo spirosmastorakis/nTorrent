@@ -57,7 +57,7 @@ class IoUtil {
   template<typename T>
   static std::vector<T>
   load_directory(const std::string& dirPath,
-                 ndn::io::IoEncoding encoding = ndn::io::IoEncoding::BASE_64);
+                 ndn::io::IoEncoding encoding = ndn::io::IoEncoding::BASE64);
 
   static std::vector<ndn::Data>
   packetize_file(const fs::path& filePath,
