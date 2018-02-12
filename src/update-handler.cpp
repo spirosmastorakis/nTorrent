@@ -35,14 +35,17 @@ UpdateHandler::sendAliveInterest(StatsTable::iterator iter)
 
   shared_ptr<Interest> i = make_shared<Interest>(interestName);
 
-  // Create and set the LINK object
-  Link link(interestName, { {1, iter->getRecordName()} });
-  m_keyChain->sign(link, signingWithSha256());
-  Block linkWire = link.wireEncode();
+  // Create and set the forwarding hint
+  Delegation del;
+  del.preference = 1;
+  del.name = iter->getRecordName();
 
-  i->setLink(linkWire);
+  DelegationList list({del});
+
+  i->setForwardingHint(list);
 
   m_face->expressInterest(*i, bind(&UpdateHandler::decodeDataPacketContent, this, _1, _2),
+                          bind(&UpdateHandler::tryNextRoutablePrefix, this, _1),
                           bind(&UpdateHandler::tryNextRoutablePrefix, this, _1));
   m_face->processEvents(time::milliseconds(-1));
 }
@@ -166,7 +169,8 @@ UpdateHandler::learnOwnRoutablePrefix()
     this->learnOwnRoutablePrefix();
   };
 
-  m_face->expressInterest(i, prefixReceived, prefixRetrievalFailed);
+  //TODO(Spyros): For now, we do nothing when we receive a NACK
+  m_face->expressInterest(i, prefixReceived, nullptr, prefixRetrievalFailed);
   m_face->processEvents(time::milliseconds(-1));
 }
 
@@ -191,8 +195,7 @@ UpdateHandler::onRegisterFailed(const Name& prefix, const std::string& reason)
 void
 UpdateHandler::tryNextRoutablePrefix(const Interest& interest)
 {
-  Link link(interest.getLink());
-  const Name& name = link.getDelegations().begin()->second;
+  const Name& name = interest.getForwardingHint().begin()->name;
   auto iter = m_statsTable->find(name);
 
   if (iter != m_statsTable->end()) {
@@ -209,15 +212,17 @@ UpdateHandler::tryNextRoutablePrefix(const Interest& interest)
 
   shared_ptr<Interest> newInterest = make_shared<Interest>(interest);
 
-  link.removeDelegation(name);
-  link.addDelegation(1, iter->getRecordName());
+  // Create and set the forwarding hint
+  Delegation del;
+  del.preference = 1;
+  del.name = iter->getRecordName();
 
-  m_keyChain->sign(link, signingWithSha256());
-  Block block = link.wireEncode();
+  DelegationList list({del});
 
-  newInterest->setLink(block);
+  newInterest->setForwardingHint(list);
 
   m_face->expressInterest(*newInterest, bind(&UpdateHandler::decodeDataPacketContent, this, _1, _2),
+                          bind(&UpdateHandler::tryNextRoutablePrefix, this, _1),
                           bind(&UpdateHandler::tryNextRoutablePrefix, this, _1));
   m_face->processEvents(time::milliseconds(-1));
 }

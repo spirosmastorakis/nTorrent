@@ -72,13 +72,13 @@ class FetchingStrategyManager {
      * @brief Callback to be called when data is received
      */
     virtual void
-    onDataPacketReceived(const ndn::Data& data) = 0;
+    onDataPacketReceived(const ndn::Name& name) = 0;
 
     /**
      * @brief Callback to be called when data retrieval failed
      */
     virtual void
-    onDataRetrievalFailure(const ndn::Interest& interest, const std::string& errorCode) = 0;
+    onDataRetrievalFailure(const ndn::Name& name, const std::string& errorCode) = 0;
 
     /**
      * @brief Callback to be called when a torrent file segment is received

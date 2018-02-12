@@ -142,7 +142,7 @@ TorrentFile::erase(const Name& name)
 void
 TorrentFile::encodeContent()
 {
-  onChanged();
+  resetWire();
 
   EncodingEstimator estimator;
   size_t estimatedSize = encodeContent(estimator);

@@ -237,7 +237,7 @@ void FileManifest::encodeContent() {
 
   // MetaData    := Property*
   // Property    := DataSize | Signature
-  onChanged();
+  resetWire();
 
   EncodingEstimator estimator;
   size_t estimatedSize = encodeContent(estimator);

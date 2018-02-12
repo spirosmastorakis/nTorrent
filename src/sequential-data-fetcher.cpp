@@ -132,10 +132,10 @@ SequentialDataFetcher::implementSequentialLogic() {
 }
 
 void
-SequentialDataFetcher::onDataPacketReceived(const ndn::Data& data)
+SequentialDataFetcher::onDataPacketReceived(const ndn::Name& name)
 {
   // Data Packet Received
-  LOG_INFO << "Data Packet Received: " << data.getName();
+  LOG_INFO << "Data Packet Received: " << name;
 }
 
 void
@@ -155,27 +155,27 @@ SequentialDataFetcher::onManifestReceived(const std::vector<Name>& packetNames)
 }
 
 void
-SequentialDataFetcher::onDataRetrievalFailure(const ndn::Interest& interest,
+SequentialDataFetcher::onDataRetrievalFailure(const ndn::Name& name,
                                               const std::string& errorCode)
 {
   // Data retrieval failure
-  uint32_t nameType = IoUtil::findType(interest.getName());
+  uint32_t nameType = IoUtil::findType(name);
   if (nameType == IoUtil::TORRENT_FILE) {
     // this should never happen
-    LOG_ERROR << "Torrent File Segment Downloading Failed: " << interest.getName();
+    LOG_ERROR << "Torrent File Segment Downloading Failed: " << name;
     this->downloadTorrentFile();
   }
   else if (nameType == IoUtil::FILE_MANIFEST) {
-    LOG_ERROR << "Manifest File Segment Downloading Failed: " << interest.getName();
-    this->downloadManifestFiles({ interest.getName() });
+    LOG_ERROR << "Manifest File Segment Downloading Failed: " << name;
+    this->downloadManifestFiles({ name });
   }
   else if (nameType == IoUtil::DATA_PACKET) {
-    LOG_ERROR << "Data Packet Downloading Failed: " << interest.getName();
-    this->downloadPackets({ interest.getName() });
+    LOG_ERROR << "Data Packet Downloading Failed: " << name;
+    this->downloadPackets({ name });
   }
   else {
     // This should never happen
-    LOG_ERROR << "Unknown Packet Type Downloading Failed: " << interest.getName();
+    LOG_ERROR << "Unknown Packet Type Downloading Failed: " << name;
   }
 }
 

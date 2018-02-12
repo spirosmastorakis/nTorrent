@@ -85,10 +85,10 @@ class SequentialDataFetcher : FetchingStrategyManager {
     implementSequentialLogic();
 
     virtual void
-    onDataPacketReceived(const ndn::Data& data);
+    onDataPacketReceived(const ndn::Name& name);
 
     virtual void
-    onDataRetrievalFailure(const ndn::Interest& interest, const std::string& errorCode);
+    onDataRetrievalFailure(const ndn::Name& name, const std::string& errorCode);
 
     virtual void
     onManifestReceived(const std::vector<Name>& packetNames);
