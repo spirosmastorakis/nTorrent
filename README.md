@@ -7,6 +7,9 @@ BitTorrent in TCP/IP networks.
 Please submit any bugs or issues to the nTorrent issue tracker:
 http://redmine.named-data.net/projects/ntorrent/issues
 
+For the nTorrent simulation code running in ndnSIM, please take a look here:
+https://github.com/AkshayRaman/scenario-ntorrent
+
 ## More documentation
 
 Extensive documentation is coming soon!
